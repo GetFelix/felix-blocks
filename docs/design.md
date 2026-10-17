@@ -270,8 +270,9 @@ Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 | [Blocky Characters](https://kenney.nl/assets/blocky-characters) (20 assets) | Low-poly characters | Other players |
 | [Survival Kit](https://kenney.nl/assets/survival-kit) (80 assets) | Props: tools, tents, crates | Held items, decoration |
 
-None are committed yet. Picking from these, restyling to one palette and
-building the atlas is M0 work.
+The style frame uses the Voxel Pack and Blocky Characters from
+`prototype/assets/`; [docs/art.md](art.md) has the palette and the restyling.
+Moving them into the client and building the atlas there is M0 work.
 
 ## Build order
 
