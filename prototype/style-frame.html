@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Felix Blocks style frame</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: rgba(12, 20, 28, 0.62);
+    --panel-solid: rgba(12, 20, 28, 0.78);
+    --line: rgba(255, 255, 255, 0.12);
+    --text: #f1f6f9;
+    --muted: #a3b4c0;
+    --cyan: hsl(192, 90%, 46%);
+    --cyan-soft: hsla(192, 90%, 46%, 0.35);
+    --ada: #ff7a59;
+    --kofi: #a37cf0;
+  }
+  html, body { margin: 0; height: 100%; background: #8fc6e8; color: var(--text); font: 500 14px/1.4 Inter, system-ui, sans-serif; overflow: hidden; user-select: none; }
+  canvas { display: block; }
+  .ui { position: fixed; }
+  .chip { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 6px 24px rgba(0, 20, 40, 0.18); }
+  .brand { top: 16px; left: 16px; font-weight: 700; font-size: 15px; letter-spacing: 0.01em; }
+  .brand img { width: 38px; height: 38px; object-fit: contain; }
+  .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; letter-spacing: 0; }
+  .brand small b { font: 500 12px "JetBrains Mono", monospace; color: var(--text); }
+  .hud { top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .coords { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 4px; min-width: 196px; }
+  .row { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 12px; }
+  .row b { font: 500 13px "JetBrains Mono", monospace; color: var(--text); }
+  .xyz { display: flex; gap: 12px; font: 700 15px "JetBrains Mono", monospace; }
+  .xyz i { font-style: normal; color: var(--cyan); margin-right: 4px; }
+  .players { padding: 8px 12px; flex-direction: column; align-items: stretch; gap: 6px; min-width: 196px; }
+  .players header { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+  .players header b { color: var(--cyan); font: 500 12px "JetBrains Mono", monospace; display: flex; align-items: center; gap: 6px; }
+  .players header b::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .p { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .p span { width: 12px; height: 12px; border-radius: 3px; }
+  .p em { margin-left: auto; font: 500 12px "JetBrains Mono", monospace; font-style: normal; color: var(--muted); }
+  .feed { left: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; max-width: 340px; }
+  .feed div { padding: 6px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; color: var(--muted); }
+  .feed b { color: var(--text); font-weight: 600; }
+  .feed code { font: 500 12px "JetBrains Mono", monospace; color: var(--text); }
+  .cross { left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+  .cross::before, .cross::after { content: ""; position: absolute; background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25); border-radius: 1px; }
+  .cross::before { left: 10px; top: 2px; width: 2px; height: 18px; }
+  .cross::after { top: 10px; left: 2px; width: 18px; height: 2px; }
+  .bar { left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .label { padding: 4px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font-weight: 600; font-size: 13px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .label kbd { font: 500 11px "JetBrains Mono", monospace; color: var(--muted); margin-left: 6px; }
+  .hotbar { display: flex; gap: 6px; padding: 6px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 20, 40, 0.25); }
+  .slot { position: relative; width: 56px; height: 56px; border-radius: 11px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.06); display: grid; place-items: center; }
+  .slot canvas { width: 42px; height: 42px; }
+  .slot small { position: absolute; left: 5px; top: 3px; font: 500 10px "JetBrains Mono", monospace; color: var(--muted); }
+  .slot.on { background: hsla(192, 90%, 46%, 0.18); border: 2px solid var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft), 0 0 22px hsla(192, 90%, 46%, 0.45); }
+  .slot.on small { color: var(--text); }
+  .vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(10, 30, 50, 0.22) 100%); }
+  .hidden { display: none !important; }
+  @media (max-width: 760px) { .feed, .players { display: none; } .slot { width: 40px; height: 40px; } .slot canvas { width: 30px; height: 30px; } }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+<div class="vignette"></div>
+<div class="ui chip brand"><img src="../docs/brand/felix-blocks-mark.png" alt=""><div>Felix Blocks<small>Meadow world · seed <b>4127</b></small></div></div>
+<div class="ui hud">
+  <div class="chip coords">
+    <div class="xyz" id="xyz"></div>
+    <div class="row">chunk <b id="chunk"></b></div>
+    <div class="row">facing <b id="facing"></b></div>
+  </div>
+  <div class="chip players">
+    <header>Builders <b>synced</b></header>
+    <div class="p"><span style="background: var(--cyan)"></span>you<em>—</em></div>
+    <div class="p"><span style="background: var(--ada)"></span>ada<em>24 ms</em></div>
+    <div class="p"><span style="background: var(--kofi)"></span>kofi<em>61 ms</em></div>
+  </div>
+</div>
+<div class="ui feed">
+  <div><b>kofi</b> joined the world</div>
+  <div><b>ada</b> placed <b>Oak planks</b> at <code id="placed"></code></div>
+  <div><b>you</b> placed <b>Glass</b> at <code id="placed2"></code></div>
+</div>
+<div class="ui cross" id="cross"></div>
+<div class="ui bar">
+  <div class="label" id="label">Glass<kbd>5</kbd></div>
+  <div class="hotbar" id="hotbar"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ?view=overview for the wide shot, ?ui=0 hides the overlay.
+const params = new URLSearchParams(location.search);
+const overview = params.get('view') === 'overview';
+if (params.get('ui') === '0') document.querySelectorAll('.ui').forEach((e) => e.classList.add('hidden'));
+if (overview) document.getElementById('cross').classList.add('hidden');
+
+const SEED = 4127;
+const W = 128, D = 128, H = 56, SEA = 15;
+// Shown coordinates are offset so the frame reads like a spot in a large world.
+const ORIGIN = { x: 1136, z: -472 };
+
+// ---------- palette ----------
+// Kenney tiles, restyled at atlas build time. Filters adjust a tile; a tint recolours its
+// green pixels by brightness, the way grass is tinted by biome. Greens follow the mark.
+const TINT = { grass: [102, 174, 62], leaves: [66, 146, 58], tuft: [94, 166, 58] };
+const TILES = {
+  grass_top: TINT.grass,
+  dirt_grass: TINT.grass, dirt: null, stone: 'saturate(0.7)', greystone: 'saturate(0.6) brightness(1.3)', gravel_stone: 'saturate(0.7)',
+  stone_coal: 'saturate(0.7)', stone_iron: 'saturate(0.7)', sand: null, water: null,
+  trunk_side: null, trunk_top: null, leaves_transparent: TINT.leaves,
+  wood: null, wood_red: 'saturate(0.85)', glass: null, brick_red: null,
+  grass1: TINT.tuft, grass2: TINT.tuft, grass3: TINT.tuft, grass4: TINT.tuft,
+  wheat_stage4: null,
+};
+const SKY = { zenith: 0x3f93dc, horizon: 0xcfe8f6, fog: 0xc6e2f3 };
+const CYAN = new THREE.Color().setHSL(192 / 360, 0.9, 0.46);
+
+const A = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WATER = 5, LOG = 6, LEAVES = 7, PLANKS = 8, GLASS = 9, BRICK = 10, GRAVEL = 11, COAL = 12, IRON = 13, COBBLE = 14, ROOF = 15;
+// [top, side, bottom], pass, name
+const BLOCKS = {
+  [GRASS]: [['grass_top', 'dirt_grass', 'dirt'], 'opaque', 'Grass'],
+  [DIRT]: [['dirt', 'dirt', 'dirt'], 'opaque', 'Dirt'],
+  [STONE]: [['stone', 'stone', 'stone'], 'opaque', 'Stone'],
+  [SAND]: [['sand', 'sand', 'sand'], 'opaque', 'Sand'],
+  [WATER]: [['water', 'water', 'water'], 'water', 'Water'],
+  [LOG]: [['trunk_top', 'trunk_side', 'trunk_top'], 'opaque', 'Oak log'],
+  [LEAVES]: [['leaves_transparent', 'leaves_transparent', 'leaves_transparent'], 'cutout', 'Leaves'],
+  [PLANKS]: [['wood', 'wood', 'wood'], 'opaque', 'Oak planks'],
+  [GLASS]: [['glass', 'glass', 'glass'], 'glass', 'Glass'],
+  [BRICK]: [['brick_red', 'brick_red', 'brick_red'], 'opaque', 'Brick'],
+  [GRAVEL]: [['gravel_stone', 'gravel_stone', 'gravel_stone'], 'opaque', 'Gravel'],
+  [COAL]: [['stone_coal', 'stone_coal', 'stone_coal'], 'opaque', 'Coal ore'],
+  [IRON]: [['stone_iron', 'stone_iron', 'stone_iron'], 'opaque', 'Iron ore'],
+  [COBBLE]: [['greystone', 'greystone', 'greystone'], 'opaque', 'Cobblestone'],
+  [ROOF]: [['wood_red', 'wood_red', 'wood_red'], 'opaque', 'Red planks'],
+};
+const HOTBAR = [GRASS, DIRT, STONE, PLANKS, GLASS, BRICK, ROOF, LOG, SAND];
+const SELECTED = 4;
+const isOpaque = (b) => b !== A && BLOCKS[b][1] === 'opaque';
+const occludes = (b) => isOpaque(b) || b === LEAVES;
+
+// ---------- seeded noise ----------
+function hash2(x, z, s = 0) {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(z | 0, 668265263) + Math.imul(SEED + s, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function noise(x, z, s = 0) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+  const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  const a = hash2(ix, iz, s), b = hash2(ix + 1, iz, s), c = hash2(ix, iz + 1, s), d = hash2(ix + 1, iz + 1, s);
+  return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1;
+}
+function fbm(x, z, s = 0, oct = 4) {
+  let t = 0, amp = 1, norm = 0;
+  for (let i = 0; i < oct; i++) { t += noise(x, z, s + i * 17) * amp; norm += amp; amp *= 0.5; x *= 2; z *= 2; }
+  return t / norm;
+}
+let rs = SEED;
+const rand = () => { rs = (rs + 0x6d2b79f5) | 0; let t = Math.imul(rs ^ (rs >>> 15), 1 | rs); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const smooth = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+
+// ---------- terrain ----------
+const world = new Uint8Array(W * H * D);
+const idx = (x, y, z) => (y * D + z) * W + x;
+const get = (x, y, z) => (y < 0 ? STONE : x < 0 || z < 0 || x >= W || z >= D || y >= H ? A : world[idx(x, y, z)]);
+const set = (x, y, z, b) => { if (x >= 0 && z >= 0 && x < W && z < D && y >= 0 && y < H) world[idx(x, y, z)] = b; };
+
+const HOUSE = { x0: 55, z0: 74, w: 9, d: 7 };
+const PLOT_H = 18;
+const MOUNT = { x: 36, z: 22 }, LAKE = { x: 92, z: 76 }, CLIFF_Z = 60;
+const cliffEdge = (x) => CLIFF_Z + fbm(x / 9, 0.5, 6) * 4;
+function heightAt(x, z) {
+  let h = 18 + fbm(x / 46, z / 46, 1) * 4 + fbm(x / 13, z / 13, 2) * 1.4;
+  // A plateau behind the yard that ends in a stone cliff, with the mountain on top.
+  const edge = cliffEdge(x);
+  h += 12 * smooth((edge - z) / 1.6) * smooth(1.4 - Math.abs(x - 50) / 30);
+  const wx = x + noise(x / 18, z / 18, 7) * 9, wz = z + noise(x / 18, z / 18, 8) * 9;
+  const dm = Math.hypot(wx - MOUNT.x, (wz - MOUNT.z) * 1.1) / (36 + fbm(x / 20, z / 20, 3) * 6);
+  const ridge = 1 - Math.abs(fbm(x / 15, z / 15, 4));
+  h += 24 * smooth(1 - dm) * (0.55 + 0.6 * ridge);
+  const dl = Math.hypot(x - LAKE.x, (z - LAKE.z) * 0.8) / (21 + fbm(x / 12, z / 12, 5) * 5);
+  h -= 9 * smooth(1.25 - dl);
+  h += 5 * smooth(1 - Math.hypot(x - 76, z - 110) / 22);
+  // Level ground for the house and its yard.
+  const px = Math.max(HOUSE.x0 - 6 - x, 0, x - (HOUSE.x0 + HOUSE.w + 9)), pz = Math.max(HOUSE.z0 - 4 - z, 0, z - (HOUSE.z0 + HOUSE.d + 8));
+  const f = smooth(1 - Math.hypot(px, pz) / 6);
+  h = h * (1 - f) + PLOT_H * f;
+  return Math.round(h);
+}
+const heights = new Int16Array(W * D);
+for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) heights[z * W + x] = heightAt(x, z);
+const hAt = (x, z) => heights[Math.min(D - 1, Math.max(0, z)) * W + Math.min(W - 1, Math.max(0, x))];
+
+for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+  const h = hAt(x, z);
+  const slope = Math.max(Math.abs(h - hAt(x + 1, z)), Math.abs(h - hAt(x - 1, z)), Math.abs(h - hAt(x, z + 1)), Math.abs(h - hAt(x, z - 1)));
+  const beach = h <= SEA + 1;
+  const rocky = slope >= 3 || (slope >= 2 && h > 27) || h > 40;
+  for (let y = 0; y <= h; y++) {
+    let b = STONE;
+    if (h < SEA - 1 && y >= h - 1) b = hash2(x, z, 13) < 0.5 ? GRAVEL : DIRT;
+    else if (y === h) b = beach ? SAND : rocky ? (hash2(x, z, 9) < 0.2 ? COBBLE : STONE) : GRASS;
+    else if (y >= h - 3) b = beach ? SAND : rocky ? STONE : DIRT;
+    if (b === STONE) { const r = hash2(x * 7 + y, z * 3 - y, 11); if (r < 0.008) b = COAL; else if (r < 0.012) b = IRON; }
+    set(x, y, z, b);
+  }
+  for (let y = h + 1; y <= SEA; y++) set(x, y, z, WATER);
+}
+
+// Cave: a tunnel of overlapping spheres bored into the mountain's near face.
+{
+  let cx = 66, cy = PLOT_H + 2.2, cz = 38;
+  for (let i = 0; i < 40 && cz < cliffEdge(cx) - 0.5; i++) {
+    const r = 2.5 + 0.4 * Math.sin(i * 0.7);
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let z = Math.floor(cz - r); z <= cz + r; z++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      const dy = (y + 0.5 - cy) * (y < cy ? 1.6 : 1);
+      if (y > PLOT_H && (x + 0.5 - cx) ** 2 + dy ** 2 + (z + 0.5 - cz) ** 2 < r * r && get(x, y, z) !== WATER) set(x, y, z, A);
+    }
+    cz += 0.7; cx -= Math.sin(i * 0.3) * 0.3;
+  }
+  // An arched mouth cut square into the cliff face so it reads from a distance.
+  const mx = 65, ez = Math.round(cliffEdge(mx));
+  for (let z = ez - 14; z <= ez + 4; z++) for (let x = mx - 3; x <= mx + 3; x++) {
+    const top = PLOT_H + (Math.abs(x - mx) === 3 ? 3 : Math.abs(x - mx) === 2 ? 4 : 5);
+    for (let y = PLOT_H + 1; y <= top; y++) set(x, y, z, A);
+    const b = get(x, PLOT_H, z);
+    if (get(x, PLOT_H + 1, z) === A && (b === STONE || b === DIRT || b === COAL || b === IRON || b === COBBLE)) set(x, PLOT_H, z, z > ez + 1 ? GRASS : STONE);
+  }
+  // Gravel on the cave floor, only where there is rock overhead.
+  for (let z = 30; z < 72; z++) for (let x = 56; x < 76; x++) {
+    const y = PLOT_H, b = get(x, y, z);
+    let roofed = false;
+    for (let k = 1; k < 9; k++) if (get(x, y + k, z) !== A) roofed = true;
+    if (roofed && get(x, y + 1, z) === A && b !== A && b !== WATER && hash2(x, z, 21) < 0.6) set(x, y, z, GRAVEL);
+  }
+}
+
+// The house: cobblestone footing, log corners, plank walls, glass windows, stepped red roof.
+const doorX = HOUSE.x0 + 4;
+{
+  const { x0, z0, w, d } = HOUSE, x1 = x0 + w - 1, z1 = z0 + d - 1, F = PLOT_H + 1;
+  for (let z = z0 - 1; z <= z1 + 1; z++) for (let x = x0 - 1; x <= x1 + 1; x++) for (let y = F; y < H; y++) set(x, y, z, A);
+  for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+    set(x, F - 1, z, COBBLE);
+    const edge = x === x0 || x === x1 || z === z0 || z === z1;
+    if (!edge) { set(x, F - 1, z, PLANKS); continue; }
+    const corner = (x === x0 || x === x1) && (z === z0 || z === z1);
+    for (let y = F; y < F + 4; y++) {
+      let b = corner ? LOG : y === F ? COBBLE : PLANKS;
+      const winFront = z === z1 && (x === x0 + 1 || x === x0 + 2 || x === x1 - 1 || x === x1 - 2) && (y === F + 1 || y === F + 2);
+      const winSide = (x === x0 || x === x1) && (z === z0 + 2 || z === z0 + 4) && (y === F + 1 || y === F + 2);
+      if (winFront || winSide) b = GLASS;
+      if (z === z1 && x === doorX && (y === F || y === F + 1 || y === F + 2)) b = A;
+      set(x, y, z, b);
+    }
+  }
+  // Gable roof with the ridge along x and one block of overhang.
+  const half = Math.ceil((d + 2) / 2);
+  for (let i = 0; i < half; i++) {
+    const y = F + 4 + i;
+    for (let x = x0 - 1; x <= x1 + 1; x++) {
+      set(x, y, z0 - 1 + i, ROOF);
+      set(x, y, z1 + 1 - i, ROOF);
+      if (x === x0 || x === x1) for (let z = z0 + i; z <= z1 - i; z++) set(x, y, z, PLANKS);
+    }
+  }
+  for (let y = F + 3; y < F + 4 + half + 1; y++) set(x1 - 2, y, z0 + 1, BRICK);
+  // Gravel path from the door and a wheat field beside the house.
+  for (let z = z1 + 1; z <= z1 + 9; z++) { set(doorX, PLOT_H, z, GRAVEL); if (hash2(z, 3, 5) < 0.5) set(doorX - 1, PLOT_H, z, GRAVEL); }
+}
+const FIELD = { x0: HOUSE.x0 + HOUSE.w + 2, z0: HOUSE.z0 + 1, w: 5, d: 6 };
+const plants = [];
+for (let z = FIELD.z0; z < FIELD.z0 + FIELD.d; z++) for (let x = FIELD.x0; x < FIELD.x0 + FIELD.w; x++) {
+  if (x === FIELD.x0 + 2) { set(x, PLOT_H, z, WATER); continue; }
+  set(x, PLOT_H, z, DIRT);
+  plants.push([x, PLOT_H + 1, z, 'wheat_stage4']);
+}
+
+// Trees, kept off the yard, the beach and the cliffs.
+function tree(x, z) {
+  const y0 = hAt(x, z) + 1, th = 4 + Math.floor(rand() * 3);
+  for (let y = y0 - 2 + th; y <= y0 + th + 1; y++) {
+    const top = y - (y0 + th - 2), r = top >= 2 ? 1 : 2;
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.abs(dx) === r && Math.abs(dz) === r && (r === 1 ? top === 3 : rand() < 0.6)) continue;
+      if (get(x + dx, y, z + dz) === A) set(x + dx, y, z + dz, LEAVES);
+    }
+  }
+  for (let y = y0; y < y0 + th; y++) set(x, y, z, LOG);
+}
+{
+  const placed = [];
+  const fixed = [[47, 79], [51, 92], [80, 70], [30, 88], [34, 72], [44, 66]];
+  for (const [x, z] of fixed) { tree(x, z); placed.push([x, z]); }
+  for (let tries = 0; tries < 900 && placed.length < 46; tries++) {
+    const x = 3 + Math.floor(rand() * (W - 6)), z = 3 + Math.floor(rand() * (D - 6));
+    if (get(x, hAt(x, z), z) !== GRASS) continue;
+    if (x > HOUSE.x0 - 6 && x < FIELD.x0 + FIELD.w + 3 && z > HOUSE.z0 - 4 && z < HOUSE.z0 + HOUSE.d + 12) continue;
+    if (x > 56 && z > 88) continue; // keep the view from the hill open
+    if (x > 58 && x < 78 && z > 54 && z < 74) continue; // and the cave mouth
+    if (placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < 6)) continue;
+    tree(x, z); placed.push([x, z]);
+  }
+}
+// Ground cover.
+for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+  const h = hAt(x, z);
+  if (get(x, h, z) !== GRASS || get(x, h + 1, z) !== A) continue;
+  const r = hash2(x, z, 31), dense = fbm(x / 10, z / 10, 33) > 0.1;
+  if (r < (dense ? 0.16 : 0.04)) plants.push([x, h + 1, z, ['grass1', 'grass2', 'grass3', 'grass4'][Math.floor(hash2(x, z, 32) * 4)]]);
+}
+
+// ---------- texture atlas ----------
+const TILE = 128, PAD = 16, CELL = TILE + PAD * 2, COLS = 8;
+const tileNames = Object.keys(TILES);
+const images = Object.fromEntries(await Promise.all(tileNames.map((n) => new Promise((res, rej) => {
+  const img = new Image();
+  img.onload = () => res([n, img]);
+  img.onerror = rej;
+  img.src = `assets/voxel-pack/tiles/${n}.png`;
+}))));
+function styledTile(name) {
+  const c = document.createElement('canvas');
+  c.width = c.height = TILE;
+  const g = c.getContext('2d');
+  const style = TILES[name];
+  if (typeof style === 'string') g.filter = style;
+  g.drawImage(images[name], 0, 0);
+  if (Array.isArray(style)) {
+    const d = g.getImageData(0, 0, TILE, TILE), p = d.data;
+    const green = (i) => p[i + 1] > p[i] + 12 && p[i + 1] > p[i + 2];
+    let sum = 0, n = 0;
+    for (let i = 0; i < p.length; i += 4) if (p[i + 3] > 0 && green(i)) { sum += p[i + 1]; n++; }
+    const mean = sum / Math.max(n, 1);
+    for (let i = 0; i < p.length; i += 4) {
+      if (!p[i + 3] || !green(i)) continue;
+      const k = Math.pow(p[i + 1] / mean, 1.4);
+      for (let c = 0; c < 3; c++) p[i + c] = Math.min(255, style[c] * k);
+    }
+    g.putImageData(d, 0, 0);
+  }
+  if (name === 'glass') {
+    // A faint fill so panes read as glass rather than holes.
+    g.filter = 'none';
+    g.globalCompositeOperation = 'destination-over';
+    g.fillStyle = 'rgba(205, 235, 250, 0.28)';
+    g.fillRect(0, 0, TILE, TILE);
+  }
+  return c;
+}
+const styled = Object.fromEntries(tileNames.map((n) => [n, styledTile(n)]));
+const rows = Math.ceil(tileNames.length / COLS);
+const atlasCanvas = document.createElement('canvas');
+atlasCanvas.width = COLS * CELL;
+atlasCanvas.height = rows * CELL;
+const ag = atlasCanvas.getContext('2d');
+ag.imageSmoothingEnabled = false;
+const uvOf = {};
+tileNames.forEach((n, i) => {
+  const cx = (i % COLS) * CELL + PAD, cy = Math.floor(i / COLS) * CELL + PAD, s = styled[n];
+  // Edge pixels are smeared into the padding so mipmaps never pull in a neighbour.
+  ag.drawImage(s, 0, 0, TILE, 1, cx, cy - PAD, TILE, PAD);
+  ag.drawImage(s, 0, TILE - 1, TILE, 1, cx, cy + TILE, TILE, PAD);
+  ag.drawImage(s, 0, 0, 1, TILE, cx - PAD, cy, PAD, TILE);
+  ag.drawImage(s, TILE - 1, 0, 1, TILE, cx + TILE, cy, PAD, TILE);
+  ag.drawImage(s, 0, 0, 1, 1, cx - PAD, cy - PAD, PAD, PAD);
+  ag.drawImage(s, TILE - 1, 0, 1, 1, cx + TILE, cy - PAD, PAD, PAD);
+  ag.drawImage(s, 0, TILE - 1, 1, 1, cx - PAD, cy + TILE, PAD, PAD);
+  ag.drawImage(s, TILE - 1, TILE - 1, 1, 1, cx + TILE, cy + TILE, PAD, PAD);
+  ag.drawImage(s, cx, cy);
+  const AW = atlasCanvas.width, AH = atlasCanvas.height;
+  uvOf[n] = [cx / AW, 1 - (cy + TILE) / AH, (cx + TILE) / AW, 1 - cy / AH];
+});
+
+// ---------- renderer and scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const atlas = new THREE.CanvasTexture(atlasCanvas);
+atlas.colorSpace = THREE.SRGBColorSpace;
+atlas.magFilter = THREE.NearestFilter;
+atlas.minFilter = THREE.LinearMipmapLinearFilter;
+atlas.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+scene.fog = overview ? new THREE.Fog(SKY.fog, 85, 200) : new THREE.Fog(SKY.fog, 50, 135);
+
+const sunDir = new THREE.Vector3(0.55, 0.78, 0.42).normalize();
+const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { zenith: { value: new THREE.Color(SKY.zenith) }, horizon: { value: new THREE.Color(SKY.horizon) }, fogc: { value: new THREE.Color(SKY.fog) }, sun: { value: sunDir } },
+  vertexShader: 'varying vec3 vDir; void main() { vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
+  fragmentShader: `
+    uniform vec3 zenith; uniform vec3 horizon; uniform vec3 fogc; uniform vec3 sun; varying vec3 vDir;
+    void main() {
+      vec3 d = normalize(vDir);
+      float h = max(d.y, 0.0);
+      vec3 c = mix(horizon, zenith, pow(h, 0.55));
+      c = mix(fogc, c, smoothstep(-0.02, 0.12, d.y));
+      float s = max(dot(d, sun), 0.0);
+      c += vec3(1.0, 0.95, 0.8) * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
+      gl_FragColor = vec4(c, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+}));
+sky.renderOrder = -1;
+scene.add(sky);
+
+const hemi = new THREE.HemisphereLight(0xd8ecff, 0x9a8a6a, 0.95);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff4e2, 2.9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.04;
+scene.add(sun, sun.target);
+
+// ---------- sky light ----------
+// Light falls straight down each column, dims through leaves and water, then spreads a few
+// blocks sideways so caves, eaves and the inside of the house fall off into shade.
+const skyLight = new Float32Array(W * H * D);
+for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+  let v = 1;
+  for (let y = H - 1; y >= 0; y--) {
+    const b = world[idx(x, y, z)];
+    if (isOpaque(b)) v = 0;
+    else if (b === LEAVES) v *= 0.65;
+    else if (b === WATER) v *= 0.85;
+    skyLight[idx(x, y, z)] = v;
+  }
+}
+for (let pass = 0; pass < 6; pass++) for (let y = 1; y < H - 1; y++) for (let z = 1; z < D - 1; z++) for (let x = 1; x < W - 1; x++) {
+  const i = idx(x, y, z);
+  if (isOpaque(world[i])) continue;
+  const m = Math.max(skyLight[i - 1], skyLight[i + 1], skyLight[i - W], skyLight[i + W], skyLight[i - W * D], skyLight[i + W * D]) * 0.8;
+  if (m > skyLight[i]) skyLight[i] = m;
+}
+const skyAt = (x, y, z) => (x < 0 || z < 0 || x >= W || z >= D || y >= H ? 1 : y < 0 ? 0 : skyLight[idx(x, y, z)]);
+
+// ---------- meshing ----------
+// Faces are culled against solid neighbours; each vertex gets an ambient occlusion
+// level from its three neighbours on the face's outer layer.
+const FACES = [
+  { n: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], side: 1 },
+  { n: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0], side: 1 },
+  { n: [0, 1, 0], u: [0, 0, 1], v: [1, 0, 0], side: 0 },
+  { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1], side: 2 },
+  { n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], side: 1 },
+  { n: [0, 0, -1], u: [0, 1, 0], v: [1, 0, 0], side: 1 },
+];
+const AO = [0.42, 0.62, 0.82, 1.0];
+function makeBuf() { return { pos: [], nor: [], uv: [], col: [], ind: [] }; }
+const bufs = { opaque: makeBuf(), cutout: makeBuf(), water: makeBuf(), glass: makeBuf() };
+
+function showFace(b, nb) {
+  if (nb === A) return true;
+  if (b === WATER) return false;
+  if (isOpaque(nb)) return false;
+  return nb !== b || b === LEAVES;
+}
+function texUV(n, dx, dy, dz) {
+  if (n[1] === 1) return [dx, 1 - dz];
+  if (n[1] === -1) return [dx, dz];
+  const s = n[2] === 1 ? dx : n[2] === -1 ? 1 - dx : n[0] === 1 ? 1 - dz : dz;
+  return [s, dy];
+}
+for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+  const b = world[idx(x, y, z)];
+  if (b === A) continue;
+  const [tex, pass] = BLOCKS[b];
+  const buf = bufs[pass];
+  for (const f of FACES) {
+    const { n, u, v } = f;
+    const nb = get(x + n[0], y + n[1], z + n[2]);
+    if (!showFace(b, nb)) continue;
+    if (b === WATER && n[1] !== 1 && nb !== A) continue;
+    const [u0, v0, u1, v1] = uvOf[tex[f.side]];
+    const lx = x + n[0], ly = y + n[1], lz = z + n[2];
+    const bx = x + Math.max(n[0], 0), by = y + Math.max(n[1], 0), bz = z + Math.max(n[2], 0);
+    const base = buf.pos.length / 3, ao = [];
+    for (const [a, c] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+      const px = bx + a * u[0] + c * v[0], py = by + a * u[1] + c * v[1], pz = bz + a * u[2] + c * v[2];
+      const su = a ? 1 : -1, sv = c ? 1 : -1;
+      const s1 = occludes(get(lx + su * u[0], ly + su * u[1], lz + su * u[2])) ? 1 : 0;
+      const s2 = occludes(get(lx + sv * v[0], ly + sv * v[1], lz + sv * v[2])) ? 1 : 0;
+      const cc = occludes(get(lx + su * u[0] + sv * v[0], ly + su * u[1] + sv * v[1], lz + su * u[2] + sv * v[2])) ? 1 : 0;
+      let sl = 0, sn = 0;
+      for (const [qx, qy, qz, solid] of [[lx, ly, lz, 0], [lx + su * u[0], ly + su * u[1], lz + su * u[2], s1], [lx + sv * v[0], ly + sv * v[1], lz + sv * v[2], s2], [lx + su * u[0] + sv * v[0], ly + su * u[1] + sv * v[1], lz + su * u[2] + sv * v[2], cc]]) {
+        if (!solid) { sl += skyAt(qx, qy, qz); sn++; }
+      }
+      const light = 0.22 + 0.78 * (sl / sn);
+      const level = b === WATER || b === GLASS ? 3 : s1 && s2 ? 0 : 3 - (s1 + s2 + cc);
+      ao.push(level);
+      const k = light * AO[level] * (0.95 + 0.05 * hash2(x * 3 + y, z * 5 - y, 71));
+      const top = b === WATER && n[1] === 1 ? -0.12 : 0;
+      buf.pos.push(px, py + top, pz);
+      buf.nor.push(n[0], n[1], n[2]);
+      const [s, t] = texUV(n, px - x, py - y, pz - z);
+      buf.uv.push(u0 + (u1 - u0) * s, v0 + (v1 - v0) * t);
+      buf.col.push(k, k, k);
+    }
+    if (ao[0] + ao[2] < ao[1] + ao[3]) buf.ind.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+    else buf.ind.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+}
+// Plants are two crossed quads.
+for (const [x, y, z, t] of plants) {
+  const [u0, v0, u1, v1] = uvOf[t], buf = bufs.cutout, j = hash2(x, z, 41) * 0.2 - 0.1;
+  for (const [ax, az, bx2, bz2] of [[0.1, 0.1, 0.9, 0.9], [0.1, 0.9, 0.9, 0.1]]) {
+    const base = buf.pos.length / 3;
+    const ph = t.startsWith('grass') ? 0.7 : 1;
+    buf.pos.push(x + ax + j, y, z + az, x + bx2 + j, y, z + bz2, x + bx2 + j, y + ph, z + bz2, x + ax + j, y + ph, z + az);
+    for (let i = 0; i < 4; i++) { buf.nor.push(0, 1, 0); }
+    buf.uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+    buf.col.push(0.82, 0.82, 0.82, 0.82, 0.82, 0.82, 1, 1, 1, 1, 1, 1);
+    buf.ind.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+}
+function geometry(b) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+  g.setIndex(b.ind);
+  return g;
+}
+const terrain = new THREE.Mesh(geometry(bufs.opaque), new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true }));
+terrain.castShadow = terrain.receiveShadow = true;
+const cutout = new THREE.Mesh(geometry(bufs.cutout), new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+cutout.castShadow = cutout.receiveShadow = true;
+const glass = new THREE.Mesh(geometry(bufs.glass), new THREE.MeshLambertMaterial({ map: atlas, transparent: true, depthWrite: false }));
+glass.receiveShadow = true;
+const water = new THREE.Mesh(geometry(bufs.water), new THREE.MeshPhongMaterial({ map: atlas, vertexColors: true, color: 0x7cc4ec, transparent: true, opacity: 0.8, shininess: 90, specular: 0x9ab8c8, depthWrite: false }));
+water.receiveShadow = true;
+scene.add(terrain, cutout, water, glass);
+
+// Flat blocky clouds.
+{
+  const cells = [];
+  for (let z = -40; z < 50; z++) for (let x = -40; x < 50; x++) if (fbm(x / 7, z / 7, 51, 3) > 0.34) cells.push([x, z]);
+  const box = new THREE.BoxGeometry(6, 2.2, 6);
+  const clouds = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdde8f0, emissiveIntensity: 0.55, transparent: true, opacity: 0.88 }), cells.length);
+  const m = new THREE.Matrix4();
+  cells.forEach(([x, z], i) => clouds.setMatrixAt(i, m.makeTranslation(W / 2 + x * 6, 92, D / 2 + z * 6)));
+  scene.add(clouds);
+}
+
+// ---------- camera ----------
+const camera = new THREE.PerspectiveCamera(overview ? 38 : 72, innerWidth / innerHeight, 0.05, 900);
+const eye = { x: 74.5, z: 104.5 };
+const eyeY = hAt(Math.floor(eye.x), Math.floor(eye.z)) + 1 + 1.62;
+let controls = null;
+if (overview) {
+  camera.position.set(124, 74, 142);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(58, 22, 60);
+  controls.update();
+} else {
+  camera.position.set(eye.x, eyeY, eye.z);
+  camera.lookAt(53, PLOT_H + 2.6, 72);
+}
+const shadowCenter = new THREE.Vector3(60, 18, 70);
+Object.assign(sun.shadow.camera, { left: -78, right: 78, top: 78, bottom: -78, near: 1, far: 260 });
+sun.position.copy(shadowCenter).addScaledVector(sunDir, 120);
+sun.target.position.copy(shadowCenter);
+
+// Free look: drag to turn in first person.
+if (!overview) {
+  const e = new THREE.Euler(0, 0, 0, 'YXZ').setFromQuaternion(camera.quaternion);
+  renderer.domElement.addEventListener('pointermove', (ev) => {
+    if (!(ev.buttons & 1)) return;
+    e.y -= ev.movementX * 0.003;
+    e.x = Math.max(-1.5, Math.min(1.5, e.x - ev.movementY * 0.003));
+    camera.quaternion.setFromEuler(e);
+    updateTarget();
+  });
+}
+
+// ---------- selection outline ----------
+const outline = new THREE.Group();
+{
+  const mat = new THREE.MeshBasicMaterial({ color: CYAN, toneMapped: false });
+  const t = 0.05, L = 1.01;
+  for (const axis of [0, 1, 2]) for (const a of [-1, 1]) for (const b of [-1, 1]) {
+    const size = [t, t, t]; size[axis] = L + t;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    const p = [0, 0, 0], o = [0, 1, 2].filter((k) => k !== axis);
+    p[o[0]] = (a * L) / 2; p[o[1]] = (b * L) / 2;
+    m.position.set(...p);
+    outline.add(m);
+  }
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.22, toneMapped: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  face.name = 'face';
+  outline.add(face);
+  scene.add(outline);
+}
+// Voxel DDA along the view ray; reach is long here so the frame can aim at the house.
+function raycast(origin, dir, reach) {
+  let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
+  const step = [Math.sign(dir.x), Math.sign(dir.y), Math.sign(dir.z)];
+  const tD = [Math.abs(1 / dir.x), Math.abs(1 / dir.y), Math.abs(1 / dir.z)];
+  const frac = (p, s) => (s > 0 ? Math.floor(p) + 1 - p : p - Math.floor(p));
+  const tM = [frac(origin.x, step[0]) * tD[0], frac(origin.y, step[1]) * tD[1], frac(origin.z, step[2]) * tD[2]];
+  let n = [0, 0, 0];
+  for (let t = 0; t < reach;) {
+    const b = get(x, y, z);
+    if (b !== A && b !== WATER) return { x, y, z, n, b };
+    const k = tM[0] < tM[1] ? (tM[0] < tM[2] ? 0 : 2) : tM[1] < tM[2] ? 1 : 2;
+    t = tM[k];
+    tM[k] += tD[k];
+    if (k === 0) x += step[0]; else if (k === 1) y += step[1]; else z += step[2];
+    n = [0, 0, 0]; n[k] = -step[k];
+  }
+  return null;
+}
+function updateTarget() {
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const hit = overview ? { x: HOUSE.x0 + 1, y: PLOT_H + 3, z: HOUSE.z0 + HOUSE.d - 1, n: [0, 0, 1] } : raycast(camera.position, dir, 40);
+  outline.visible = !!hit;
+  if (!hit) return;
+  outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+  const face = outline.getObjectByName('face');
+  face.position.set(hit.n[0] * 0.506, hit.n[1] * 0.506, hit.n[2] * 0.506);
+  face.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...hit.n)));
+  hud(dir);
+}
+
+// ---------- characters ----------
+await document.fonts.load('600 40px Inter');
+await document.fonts.load('500 30px "JetBrains Mono"');
+function nameTag(name, color) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.font = '600 52px Inter';
+  const tw = g.measureText(name).width, w = tw + 104, x0 = (512 - w) / 2;
+  g.fillStyle = 'rgba(12, 20, 28, 0.72)';
+  g.beginPath(); g.roundRect(x0, 20, w, 88, 44); g.fill();
+  g.fillStyle = color;
+  g.beginPath(); g.roundRect(x0 + 30, 52, 24, 24, 6); g.fill();
+  g.fillStyle = '#f1f6f9';
+  g.textBaseline = 'middle';
+  g.fillText(name, x0 + 70, 66);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  // Fixed screen size, like a HUD element pinned to the player.
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, toneMapped: false, fog: false, sizeAttenuation: false }));
+  const k = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.36;
+  s.scale.set(k, k / 4, 1);
+  s.renderOrder = 10;
+  return s;
+}
+const gltf = new GLTFLoader();
+const mixers = [];
+async function player(file, name, color, x, z, yaw, clip, time) {
+  const g = await gltf.loadAsync(`assets/blocky-characters/${file}.glb`);
+  const m = g.scene;
+  const box = new THREE.Box3().setFromObject(m);
+  const scale = 1.8 / (box.max.y - box.min.y);
+  m.scale.setScalar(scale);
+  m.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+  const root = new THREE.Group();
+  root.add(m);
+  m.position.y = -box.min.y * scale;
+  root.position.set(x, hAt(Math.floor(x), Math.floor(z)) + 1, z);
+  root.rotation.y = yaw;
+  const tag = nameTag(name, color);
+  tag.position.y = 2.25;
+  root.add(tag);
+  scene.add(root);
+  const mixer = new THREE.AnimationMixer(m);
+  const a = g.animations.find((c) => c.name === clip) || g.animations[0];
+  mixer.clipAction(a).play();
+  mixer.setTime(time);
+  mixers.push(mixer);
+  return root;
+}
+await Promise.all([
+  player('character-b', 'ada', '#ff7a59', doorX + 0.5 + 3.6, HOUSE.z0 + HOUSE.d + 1.2, 0.5, 'interact-right', 0.35),
+  player('character-e', 'kofi', '#a37cf0', 68.2, 97.6, 0.25, 'walk', 0.2),
+]);
+
+// ---------- overlay ----------
+function iso(top, side, size = 84) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const s = size / 2, h = s * 0.5, cx = size / 2, k = TILE;
+  // top
+  g.setTransform(s / k, h / k, -s / k, h / k, cx, size * 0.04);
+  g.drawImage(styled[top], 0, 0);
+  // left
+  g.setTransform(s / k, h / k, 0, s / k * 1.08, cx - s, size * 0.04 + h);
+  g.drawImage(styled[side], 0, 0);
+  g.fillStyle = 'rgba(10, 20, 35, 0.22)'; g.fillRect(0, 0, k, k);
+  // right
+  g.setTransform(s / k, -h / k, 0, s / k * 1.08, cx, size * 0.04 + 2 * h);
+  g.drawImage(styled[side], 0, 0);
+  g.fillStyle = 'rgba(10, 20, 35, 0.4)'; g.fillRect(0, 0, k, k);
+  return c;
+}
+const bar = document.getElementById('hotbar');
+HOTBAR.forEach((b, i) => {
+  const d = document.createElement('div');
+  d.className = 'slot' + (i === SELECTED ? ' on' : '');
+  const [t] = BLOCKS[b];
+  d.append(iso(t[0], t[1]));
+  const n = document.createElement('small'); n.textContent = i + 1; d.append(n);
+  bar.append(d);
+});
+document.getElementById('label').firstChild.textContent = BLOCKS[HOTBAR[SELECTED]][2];
+const fmt = (x, z, y) => `${x + ORIGIN.x} ${y} ${z + ORIGIN.z}`;
+document.getElementById('placed').textContent = fmt(HOUSE.x0 + 6, HOUSE.z0 + HOUSE.d - 1, PLOT_H + 4);
+document.getElementById('placed2').textContent = fmt(HOUSE.x0 + 1, HOUSE.z0 + HOUSE.d - 1, PLOT_H + 3);
+function hud(dir) {
+  const p = camera.position, x = Math.floor(p.x) + ORIGIN.x, y = Math.floor(p.y), z = Math.floor(p.z) + ORIGIN.z;
+  document.getElementById('xyz').innerHTML = `<span><i>X</i>${x}</span><span><i>Y</i>${y}</span><span><i>Z</i>${z}</span>`;
+  document.getElementById('chunk').textContent = `${Math.floor(x / 16)} ${Math.floor(y / 16)} ${Math.floor(z / 16)}`;
+  const yaw = Math.atan2(dir.x, -dir.z), names = ['north', 'east', 'south', 'west'];
+  document.getElementById('facing').textContent = names[((Math.round(yaw / (Math.PI / 2)) % 4) + 4) % 4];
+}
+updateTarget();
+
+// ---------- loop ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => {
+  controls?.update();
+  sky.position.copy(camera.position);
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

@@ -5,9 +5,13 @@
 A voxel building game for the browser, alone or with friends, whose only
 backend is [Felix](https://github.com/GetFelix/felix).
 
-> **Status:** design stage. Nothing is playable yet. The plan is in
+> **Status:** design stage. The [style frame](prototype/style-frame.html) shows the look; nothing is playable yet. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
+
+| First person | Overview |
+|---|---|
+| ![Felix Blocks style frame, first person](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, overview](docs/screenshots/style-frame-overview.jpg) |
 
 ## What you will be able to do
 
@@ -66,6 +70,7 @@ second. [docs/design.md](docs/design.md) has the details.
 ## Documentation
 
 - [docs/design.md](docs/design.md): the design, data model and build order
+- [docs/art.md](docs/art.md): art direction, the asset packs and the style frame
 - [Felix docs](https://docs.getfelix.dev/)
 
 ## Contributing
