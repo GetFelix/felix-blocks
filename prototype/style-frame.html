@@ -101,9 +101,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// ?view=overview for the wide shot, ?ui=0 hides the overlay.
+// ?view=overview for the wide shot, ?time=night for the night frame, ?ui=0 hides the overlay.
 const params = new URLSearchParams(location.search);
 const overview = params.get('view') === 'overview';
+const NIGHT = params.get('time') === 'night';
 if (params.get('ui') === '0') document.querySelectorAll('.ui').forEach((e) => e.classList.add('hidden'));
 if (overview) document.getElementById('cross').classList.add('hidden');
 
@@ -125,7 +126,11 @@ const TILES = {
   grass1: TINT.tuft, grass2: TINT.tuft, grass3: TINT.tuft, grass4: TINT.tuft,
   wheat_stage4: null,
 };
-const SKY = { zenith: 0x3f93dc, horizon: 0xcfe8f6, fog: 0xc6e2f3 };
+// Lit windows at night: the glass tile over a warm fill, kept separate so the hotbar icon stays glass.
+if (NIGHT) TILES.glass_lit = 'lit';
+const TILE_SRC = { glass_lit: 'glass' };
+const SKY = NIGHT ? { zenith: 0x0a1430, horizon: 0x2b3f68, fog: 0x1f2d4f } : { zenith: 0x3f93dc, horizon: 0xcfe8f6, fog: 0xc6e2f3 };
+document.body.style.background = NIGHT ? '#0a1430' : '';
 const CYAN = new THREE.Color().setHSL(192 / 360, 0.9, 0.46);
 
 const A = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WATER = 5, LOG = 6, LEAVES = 7, PLANKS = 8, GLASS = 9, BRICK = 10, GRAVEL = 11, COAL = 12, IRON = 13, COBBLE = 14, ROOF = 15;
@@ -332,13 +337,25 @@ const images = Object.fromEntries(await Promise.all(tileNames.map((n) => new Pro
   const img = new Image();
   img.onload = () => res([n, img]);
   img.onerror = rej;
-  img.src = `assets/voxel-pack/tiles/${n}.png`;
+  img.src = `assets/voxel-pack/tiles/${TILE_SRC[n] || n}.png`;
 }))));
 function styledTile(name) {
   const c = document.createElement('canvas');
   c.width = c.height = TILE;
   const g = c.getContext('2d');
   const style = TILES[name];
+  if (style === 'lit') {
+    g.fillStyle = 'rgb(255, 178, 92)';
+    g.fillRect(0, 0, TILE, TILE);
+    const glow = g.createRadialGradient(TILE / 2, TILE / 2, 4, TILE / 2, TILE / 2, TILE * 0.7);
+    glow.addColorStop(0, 'rgba(255, 236, 190, 0.9)');
+    glow.addColorStop(1, 'rgba(255, 236, 190, 0)');
+    g.fillStyle = glow;
+    g.fillRect(0, 0, TILE, TILE);
+    g.globalAlpha = 0.55;
+    g.drawImage(images[name], 0, 0);
+    return c;
+  }
   if (typeof style === 'string') g.filter = style;
   g.drawImage(images[name], 0, 0);
   if (Array.isArray(style)) {
@@ -394,7 +411,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = NIGHT ? 1.2 : 1.0;
 document.body.prepend(renderer.domElement);
 
 const atlas = new THREE.CanvasTexture(atlasCanvas);
@@ -407,19 +424,37 @@ const scene = new THREE.Scene();
 scene.fog = overview ? new THREE.Fog(SKY.fog, 85, 200) : new THREE.Fog(SKY.fog, 50, 135);
 
 const sunDir = new THREE.Vector3(0.55, 0.78, 0.42).normalize();
+// The moon is drawn where the first-person camera can see it; moonlight comes from behind
+// the camera like the sun does, so the faces you look at are lit.
+const moonDir = new THREE.Vector3(-0.3, 0.42, -0.86).normalize();
+const moonLightDir = new THREE.Vector3(0.35, 0.8, 0.5).normalize();
 const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { zenith: { value: new THREE.Color(SKY.zenith) }, horizon: { value: new THREE.Color(SKY.horizon) }, fogc: { value: new THREE.Color(SKY.fog) }, sun: { value: sunDir } },
+  uniforms: { zenith: { value: new THREE.Color(SKY.zenith) }, horizon: { value: new THREE.Color(SKY.horizon) }, fogc: { value: new THREE.Color(SKY.fog) }, sun: { value: sunDir }, moon: { value: moonDir }, night: { value: NIGHT ? 1 : 0 } },
   vertexShader: 'varying vec3 vDir; void main() { vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
   fragmentShader: `
-    uniform vec3 zenith; uniform vec3 horizon; uniform vec3 fogc; uniform vec3 sun; varying vec3 vDir;
+    uniform vec3 zenith; uniform vec3 horizon; uniform vec3 fogc; uniform vec3 sun; uniform vec3 moon; uniform float night; varying vec3 vDir;
+    float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
     void main() {
       vec3 d = normalize(vDir);
       float h = max(d.y, 0.0);
       vec3 c = mix(horizon, zenith, pow(h, 0.55));
       c = mix(fogc, c, smoothstep(-0.02, 0.12, d.y));
-      float s = max(dot(d, sun), 0.0);
-      c += vec3(1.0, 0.95, 0.8) * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
+      if (night > 0.5) {
+        vec3 p = d * 220.0, cell = floor(p);
+        float r = hash3(cell);
+        if (r > 0.985) {
+          vec3 o = vec3(hash3(cell + 7.1), hash3(cell + 3.7), hash3(cell + 9.3)) * 0.6 + 0.2;
+          float k = smoothstep(0.32, 0.0, length(p - cell - o)) * (0.5 + 0.5 * hash3(cell + 1.3));
+          c += vec3(0.85, 0.9, 1.0) * k * smoothstep(0.04, 0.3, d.y) * 1.4;
+        }
+        float m = max(dot(d, moon), 0.0);
+        c += vec3(0.95, 0.97, 1.0) * smoothstep(0.99955, 0.99972, m) * 1.6;
+        c += vec3(0.45, 0.55, 0.8) * (pow(m, 60.0) * 0.35 + pow(m, 8.0) * 0.12);
+      } else {
+        float s = max(dot(d, sun), 0.0);
+        c += vec3(1.0, 0.95, 0.8) * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
+      }
       gl_FragColor = vec4(c, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
@@ -428,9 +463,9 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.Shad
 sky.renderOrder = -1;
 scene.add(sky);
 
-const hemi = new THREE.HemisphereLight(0xd8ecff, 0x9a8a6a, 0.95);
+const hemi = NIGHT ? new THREE.HemisphereLight(0x6a84c8, 0x232838, 1.1) : new THREE.HemisphereLight(0xd8ecff, 0x9a8a6a, 0.95);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff4e2, 2.9);
+const sun = NIGHT ? new THREE.DirectionalLight(0x9fb6ff, 0.7) : new THREE.DirectionalLight(0xfff4e2, 2.9);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.bias = -0.0005;
@@ -496,7 +531,7 @@ for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x
     const nb = get(x + n[0], y + n[1], z + n[2]);
     if (!showFace(b, nb)) continue;
     if (b === WATER && n[1] !== 1 && nb !== A) continue;
-    const [u0, v0, u1, v1] = uvOf[tex[f.side]];
+    const [u0, v0, u1, v1] = uvOf[NIGHT && b === GLASS ? 'glass_lit' : tex[f.side]];
     const lx = x + n[0], ly = y + n[1], lz = z + n[2];
     const bx = x + Math.max(n[0], 0), by = y + Math.max(n[1], 0), bz = z + Math.max(n[2], 0);
     const base = buf.pos.length / 3, ao = [];
@@ -551,18 +586,72 @@ const terrain = new THREE.Mesh(geometry(bufs.opaque), new THREE.MeshLambertMater
 terrain.castShadow = terrain.receiveShadow = true;
 const cutout = new THREE.Mesh(geometry(bufs.cutout), new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }));
 cutout.castShadow = cutout.receiveShadow = true;
-const glass = new THREE.Mesh(geometry(bufs.glass), new THREE.MeshLambertMaterial({ map: atlas, transparent: true, depthWrite: false }));
+const glass = new THREE.Mesh(geometry(bufs.glass), NIGHT
+  ? new THREE.MeshBasicMaterial({ map: atlas, color: 0xffe2b8 })
+  : new THREE.MeshLambertMaterial({ map: atlas, transparent: true, depthWrite: false }));
 glass.receiveShadow = true;
-const water = new THREE.Mesh(geometry(bufs.water), new THREE.MeshPhongMaterial({ map: atlas, vertexColors: true, color: 0x7cc4ec, transparent: true, opacity: 0.8, shininess: 90, specular: 0x9ab8c8, depthWrite: false }));
+const water = new THREE.Mesh(geometry(bufs.water), new THREE.MeshPhongMaterial({ map: atlas, vertexColors: true, color: NIGHT ? 0x5d86b8 : 0x7cc4ec, transparent: true, opacity: 0.8, shininess: 90, specular: NIGHT ? 0x6f88b8 : 0x9ab8c8, depthWrite: false }));
 water.receiveShadow = true;
 scene.add(terrain, cutout, water, glass);
+// Moonlight takes the colour out of things; a cool tint on the blocks does the same.
+if (NIGHT) for (const m of [terrain, cutout]) m.material.color.set(0x9aaad8);
+
+// ---------- night lights ----------
+// Warm light inside the house spills out of the door and windows; torches mark the door,
+// the end of the path and the cave mouth. Point lights have no shadows, so they stay short.
+if (NIGHT) {
+  const F = PLOT_H + 1, z1 = HOUSE.z0 + HOUSE.d - 1;
+  const inside = new THREE.PointLight(0xffa860, 30, 9, 2);
+  inside.position.set(HOUSE.x0 + HOUSE.w / 2, F + 1.8, HOUSE.z0 + HOUSE.d / 2);
+  const spill = new THREE.PointLight(0xffa860, 16, 0, 2);
+  spill.position.set(doorX + 0.5, F + 1.2, z1 + 1.6);
+  scene.add(inside, spill);
+  const halo = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    r.addColorStop(0, 'rgba(255, 210, 140, 0.9)');
+    r.addColorStop(0.25, 'rgba(255, 170, 80, 0.35)');
+    r.addColorStop(1, 'rgba(255, 150, 60, 0)');
+    g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.SpriteMaterial({ map: t, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  })();
+  const stick = new THREE.MeshLambertMaterial({ color: 0x6b4a2c });
+  const flame = new THREE.MeshBasicMaterial({ color: 0xffd48a, toneMapped: false });
+  function torch(x, y, z, post) {
+    const g = new THREE.Group();
+    const h = post ? 1.6 : 0.55;
+    const s = new THREE.Mesh(new THREE.BoxGeometry(post ? 0.16 : 0.12, h, post ? 0.16 : 0.12), stick);
+    s.position.y = h / 2;
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), flame);
+    f.position.y = h + 0.08;
+    const glow = new THREE.Sprite(halo);
+    glow.scale.setScalar(1.6);
+    glow.position.y = h + 0.1;
+    const light = new THREE.PointLight(0xff8c40, 14, 0, 2);
+    light.position.y = h + 0.3;
+    g.add(s, f, glow, light);
+    g.position.set(x, y, z);
+    s.castShadow = true;
+    scene.add(g);
+  }
+  torch(doorX - 0.6, F + 1.3, z1 + 1.12, false);
+  torch(doorX + 1.6, F + 1.3, z1 + 1.12, false);
+  torch(doorX + 1.5, PLOT_H + 1, z1 + 9.5, true);
+  const mx = 65, ez = Math.round(cliffEdge(mx));
+  torch(mx + 3.5, hAt(mx + 4, ez + 2) + 1, ez + 2.5, true);
+  torch(64.5, hAt(64, 97) + 1, 97.5, true);
+}
 
 // Flat blocky clouds.
 {
   const cells = [];
   for (let z = -40; z < 50; z++) for (let x = -40; x < 50; x++) if (fbm(x / 7, z / 7, 51, 3) > 0.34) cells.push([x, z]);
   const box = new THREE.BoxGeometry(6, 2.2, 6);
-  const clouds = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdde8f0, emissiveIntensity: 0.55, transparent: true, opacity: 0.88 }), cells.length);
+  const clouds = new THREE.InstancedMesh(box, NIGHT
+    ? new THREE.MeshLambertMaterial({ color: 0x55648a, emissive: 0x1c2846, emissiveIntensity: 1, transparent: true, opacity: 0.4 })
+    : new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xdde8f0, emissiveIntensity: 0.55, transparent: true, opacity: 0.88 }), cells.length);
   const m = new THREE.Matrix4();
   cells.forEach(([x, z], i) => clouds.setMatrixAt(i, m.makeTranslation(W / 2 + x * 6, 92, D / 2 + z * 6)));
   scene.add(clouds);
@@ -584,7 +673,7 @@ if (overview) {
 }
 const shadowCenter = new THREE.Vector3(60, 18, 70);
 Object.assign(sun.shadow.camera, { left: -78, right: 78, top: 78, bottom: -78, near: 1, far: 260 });
-sun.position.copy(shadowCenter).addScaledVector(sunDir, 120);
+sun.position.copy(shadowCenter).addScaledVector(NIGHT ? moonLightDir : sunDir, 120);
 sun.target.position.copy(shadowCenter);
 
 // Free look: drag to turn in first person.
@@ -681,7 +770,12 @@ async function player(file, name, color, x, z, yaw, clip, time) {
   const box = new THREE.Box3().setFromObject(m);
   const scale = 1.8 / (box.max.y - box.min.y);
   m.scale.setScalar(scale);
-  m.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+  const tinted = new Set();
+  m.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = o.receiveShadow = true;
+    if (NIGHT && !tinted.has(o.material)) { tinted.add(o.material); o.material.color.multiply(new THREE.Color(0xb4c0e4)); }
+  });
   const root = new THREE.Group();
   root.add(m);
   m.position.y = -box.min.y * scale;

@@ -4,9 +4,9 @@ Felix Blocks should look like a sunny afternoon in a world you made: bright, cle
 and friendly, with enough shading that the blocks read as solid things and not
 flat tiles. The reference is [prototype/style-frame.html](../prototype/style-frame.html).
 
-| First person | Overview |
-|---|---|
-| ![First person](screenshots/style-frame-first-person.jpg) | ![Overview](screenshots/style-frame-overview.jpg) |
+| First person | Night | Overview |
+|---|---|---|
+| ![First person](screenshots/style-frame-first-person.jpg) | ![Night](screenshots/style-frame-night.jpg) | ![Overview](screenshots/style-frame-overview.jpg) |
 
 ## Assets
 
@@ -55,6 +55,22 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
   chunk, latency, slot numbers), cyan for the selected slot and Felix state.
   Hotbar icons are drawn from the same restyled tiles as the world.
 
+## Night
+
+Night is the same world under a moon: dark but never black, so you can still
+see what you are building.
+
+- **Cool and dim, not dark.** A blue hemisphere light and a weak moonlight from
+  behind the camera, with a blue-grey tint on the blocks so the greens lose their
+  daytime saturation. The sky runs from `#0a1430` to `#2b3f68`, with stars and a
+  moon, and the fog is `#1f2d4f`.
+- **Warm light is where people are.** Glass in a lit house glows amber, a warm
+  light inside spills out of the door, and torches and lanterns are short-range
+  orange point lights with a soft halo. Warm against cool is what makes a night
+  frame read.
+- **The overlay does not change.** Its dark glass panels already sit on a dark
+  scene, and the cyan selection stays the brightest cool colour on screen.
+
 ## Using the style frame
 
 Serve the repository root (`python3 -m http.server`) and open
@@ -63,6 +79,8 @@ Serve the repository root (`python3 -m http.server`) and open
 | Parameter | Effect |
 |---|---|
 | `?view=overview` | The wide shot, with orbit controls |
+| `?time=night` | The night version of either view |
 | `?ui=0` | Hide the overlay |
 
-The screenshots above are the default view and `?view=overview` at 1600 × 900.
+The screenshots above are the default view, `?time=night` and `?view=overview`
+at 1600 × 900.

@@ -5,13 +5,41 @@
 A voxel building game for the browser, alone or with friends, whose only
 backend is [Felix](https://github.com/GetFelix/felix).
 
-> **Status:** design stage. The [style frame](prototype/style-frame.html) shows the look; nothing is playable yet. The plan is in
+Felix Blocks is a first-person world of blocks that you dig and build in. You
+can play alone, open your world to friends and build together, or let people
+visit without being able to change anything. There is no game server: the
+browsers write the world, and Felix stores it, orders the writes and tells
+everyone what changed.
+
+> **Status:** design stage. The [style frame](prototype/style-frame.html) shows
+> the look, day and night; nothing is playable yet. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
-| First person | Overview |
+| Day | Night |
 |---|---|
-| ![Felix Blocks style frame, first person](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, overview](docs/screenshots/style-frame-overview.jpg) |
+| ![Felix Blocks style frame, first person by day](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, first person at night](docs/screenshots/style-frame-night.jpg) |
+
+## What it shows about Felix
+
+[felix-arena](https://github.com/GetFelix/felix-arena) uses a log as a live feed
+and a replay, and [felix-metro](https://github.com/GetFelix/felix-metro) seeks
+back through a long history. Felix Blocks is about keyed state that many people
+change at once:
+
+- **Concurrent edits resolve cleanly.** Two players digging in the same chunk
+  at the same moment both keep their blocks. Each write is conditional on the
+  version the client last saw, so the second one is refused and rebased, never
+  applied over the first.
+- **You see the world as soon as you join.** A retained cache watch delivers
+  every edited chunk around you, then each change as it lands.
+- **Storage is what was built.** Untouched terrain is generated from the seed
+  and never stored, and compaction keeps the world at its current blocks no
+  matter how many edits it has seen.
+- **Solo and shared worlds are the same thing.** Opening your world to a friend
+  is a grant, not an export.
+- **Felix enforces permissions.** A visitor's browser cannot change a world,
+  whatever it sends.
 
 ## What you will be able to do
 
@@ -36,8 +64,10 @@ backend is [Felix](https://github.com/GetFelix/felix).
 | Builders and visitors | RBAC on the world's cache |
 | Browsers | [felix-gateway](https://github.com/GetFelix/felix-gateway) |
 
-Some of these are not yet reachable through the gateway. The design lists
-them under "Felix gaps", and each one has an issue labelled
+Some of these are not yet reachable through the gateway. The biggest is
+conditional writes, which multiplayer needs
+([felix-gateway#31](https://github.com/GetFelix/felix-gateway/issues/31)). The
+design lists the rest under "Felix gaps", and each one has an issue labelled
 [`felix-gap`](https://github.com/GetFelix/felix-blocks/labels/felix-gap).
 
 ## How it works
@@ -56,21 +86,21 @@ second. [docs/design.md](docs/design.md) has the details.
 
 ## Status
 
-| M | Milestone | State |
-|---|---|---|
-| 0 | The look, locked | Planned |
-| 1 | A world you can edit, solo | Planned |
-| 2 | Multiplayer | Planned |
-| 3 | A world that lasts | Planned |
-| 4 | Worlds with owners | Planned |
-| 5 | Region watches | Planned |
-| 6 | Scale and failover | Planned |
-| 7 | Self-hosting | Planned |
+| M | Milestone | What it proves | State |
+|---|---|---|---|
+| 0 | The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame done |
+| 1 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
+| 2 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
+| 3 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
+| 4 | Worlds with owners | Builders and visitors, enforced by Felix | Planned |
+| 5 | Region watches | Joining costs what you can see, not the whole world | Planned |
+| 6 | Scale and failover | 50 players, broker restarts and failover | Planned |
+| 7 | Self-hosting | Anyone can run it | Planned |
 
 ## Documentation
 
 - [docs/design.md](docs/design.md): the design, data model and build order
-- [docs/art.md](docs/art.md): art direction, the asset packs and the style frame
+- [docs/art.md](docs/art.md): art direction, day and night, the asset packs and the style frame
 - [Felix docs](https://docs.getfelix.dev/)
 
 ## Contributing
