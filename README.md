@@ -17,8 +17,8 @@ everyone what changed.
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
-| Day | Night |
-|---|---|
+| Day                                                                                             | Night                                                                                      |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | ![Felix Blocks style frame, first person by day](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, first person at night](docs/screenshots/style-frame-night.jpg) |
 
 ## Run it
@@ -27,7 +27,9 @@ There is nothing to play yet. What runs today is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
 the atlas page, which packs the textures into one atlas and shows each at a
 distance, and the chunks page, which draws a made-up world meshed in Web Workers
-while the camera walks through it.
+while the camera walks through it (add `?adapt=1` to let the frame time pick the
+view distance, `?tier=8` to hold it at 8 chunks, and `?debug=1` for the panel with
+the frame rate; see [docs/art.md](docs/art.md#view-distance-and-the-debug-panel)).
 
 You need Node 22, Rust 1.97 with the `wasm32-unknown-unknown` target (`rustup`
 installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
@@ -46,8 +48,10 @@ and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
 distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
-world, and fails if the page does any of the meshing itself or if a merged quad
-does not look like the separate blocks it replaces.
+world, and fails if the page does any of the meshing itself, if a merged quad
+does not look like the separate blocks it replaces, or if the view distance does
+not step down under 40 ms frames. It does not show the controller following the
+frame time in both directions; the unit tests cover that.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open
@@ -85,17 +89,17 @@ change at once:
 
 ## Felix features it uses
 
-| Need | Felix feature |
-|---|---|
-| The world, one value per chunk | A log-backed cache |
-| Two players editing one chunk | Conditional writes (`cache_put_if` at the version read) |
-| Seeing the world on join, then every change | A retained cache watch |
-| Catching up after a dropped connection | Resuming a watch from an offset |
-| The world stays the size of what is built | Cache compaction |
-| Where everyone is | An in-memory stream |
-| Who is online | A cache with a TTL |
-| Builders and visitors | RBAC on the world's cache |
-| Browsers | [felix-gateway](https://github.com/GetFelix/felix-gateway) |
+| Need                                        | Felix feature                                              |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| The world, one value per chunk              | A log-backed cache                                         |
+| Two players editing one chunk               | Conditional writes (`cache_put_if` at the version read)    |
+| Seeing the world on join, then every change | A retained cache watch                                     |
+| Catching up after a dropped connection      | Resuming a watch from an offset                            |
+| The world stays the size of what is built   | Cache compaction                                           |
+| Where everyone is                           | An in-memory stream                                        |
+| Who is online                               | A cache with a TTL                                         |
+| Builders and visitors                       | RBAC on the world's cache                                  |
+| Browsers                                    | [felix-gateway](https://github.com/GetFelix/felix-gateway) |
 
 Some of these are not yet reachable through the gateway. The biggest is
 conditional writes, which multiplayer needs
@@ -119,26 +123,26 @@ second. [docs/design.md](docs/design.md) has the details.
 
 ## Status
 
-| Milestone | What it proves | State |
-|---|---|---|
-| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher and meshing in workers done |
-| A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
-| Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
-| A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
-| Worlds with owners | Builders and visitors, enforced by Felix | Planned |
-| Region watches | Joining costs what you can see, not the whole world | Planned |
-| Scale and failover | 50 players, broker restarts and failover | Planned |
-| Self-hosting | Anyone can run it | Planned |
+| Milestone                  | What it proves                                                                   | State                                                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The look, locked           | It looks good, day and night, before Felix is involved                           | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
+| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | Planned                                                                                                                                              |
+| Multiplayer                | Two players in one chunk never overwrite each other                              | Planned, needs conditional writes in the gateway                                                                                                     |
+| A world that lasts         | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned                                                                                                                                              |
+| Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |
+| Region watches             | Joining costs what you can see, not the whole world                              | Planned                                                                                                                                              |
+| Scale and failover         | 50 players, broker restarts and failover                                         | Planned                                                                                                                                              |
+| Self-hosting               | Anyone can run it                                                                | Planned                                                                                                                                              |
 
 ## Repository layout
 
-| Path | What is in it |
-|---|---|
-| `core/` | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table and the chunk mesher. Built to WebAssembly for the page |
-| `web/` | The browser client: TypeScript and Three.js, built with Vite |
-| `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence |
-| `prototype/` | The style frame, the look the client is built to match |
-| `docs/` | Design and art direction |
+| Path          | What is in it                                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/`       | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table and the chunk mesher. Built to WebAssembly for the page |
+| `web/`        | The browser client: TypeScript and Three.js, built with Vite                                                                                  |
+| `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence                                                                             |
+| `prototype/`  | The style frame, the look the client is built to match                                                                                        |
+| `docs/`       | Design and art direction                                                                                                                      |
 
 ## Documentation
 

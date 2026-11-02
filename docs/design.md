@@ -52,13 +52,13 @@ flowchart LR
     T["blocks-tool<br/>create worlds, grants"] -->|REST| CP
 ```
 
-| Component | Language | Holds state? | Responsibility |
-|---|---|---|---|
-| Client | TypeScript, Three.js, `core` as WebAssembly | A view of the chunks around the player | Generate terrain, apply stored chunk edits, mesh, render, edit, presence |
-| Gateway | [felix-gateway](https://github.com/GetFelix/felix-gateway) | No | Browser transport, token narrowing to one world, write limits |
-| Brokers | Felix | Yes, authoritative | The chunk cache, the presence stream, the online list |
-| Control plane | Felix | Yes, metadata | Token exchange, world resources, roles |
-| `blocks-tool` | Rust, `core` + control plane REST | No | Create a world's caches and streams, grant builders and visitors, inspect and export a world |
+| Component     | Language                                                   | Holds state?                           | Responsibility                                                                               |
+| ------------- | ---------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Client        | TypeScript, Three.js, `core` as WebAssembly                | A view of the chunks around the player | Generate terrain, apply stored chunk edits, mesh, render, edit, presence                     |
+| Gateway       | [felix-gateway](https://github.com/GetFelix/felix-gateway) | No                                     | Browser transport, token narrowing to one world, write limits                                |
+| Brokers       | Felix                                                      | Yes, authoritative                     | The chunk cache, the presence stream, the online list                                        |
+| Control plane | Felix                                                      | Yes, metadata                          | Token exchange, world resources, roles                                                       |
+| `blocks-tool` | Rust, `core` + control plane REST                          | No                                     | Create a world's caches and streams, grant builders and visitors, inspect and export a world |
 
 There is no game server. The browsers write the world, Felix stores and
 orders it, and the gateway decides which world a browser may reach.
@@ -98,10 +98,10 @@ a client draws it by generating the chunk and applying the delta.
 
 The delta has two encodings and the writer picks the smaller:
 
-| Encoding | Layout | Size |
-|---|---|---|
-| Sparse | count, then `(cell index u16, block u8)` per changed cell | 3 bytes per changed cell |
-| Dense | the full 4,096 cells, run-length encoded | 4,096 bytes at worst, usually a few hundred |
+| Encoding | Layout                                                    | Size                                        |
+| -------- | --------------------------------------------------------- | ------------------------------------------- |
+| Sparse   | count, then `(cell index u16, block u8)` per changed cell | 3 bytes per changed cell                    |
+| Dense    | the full 4,096 cells, run-length encoded                  | 4,096 bytes at worst, usually a few hundred |
 
 Sparse wins below about 1,360 changed cells, which covers almost every chunk
 in a normal world. A typical edited chunk (a house, a dug tunnel) changes 100
@@ -113,12 +113,12 @@ recognised and kept on it.
 
 Two shapes were considered:
 
-| | Per-edit records | Whole-chunk delta (chosen) |
-|---|---|---|
-| Write per placed block | ~8 bytes | the chunk's delta, ~1 KiB typical |
-| Stored after compaction | every edit ever made, unless someone folds them | the current delta only |
-| Join cost | replay the edits of every chunk in view | one value per edited chunk |
-| Concurrent edits | need an ordering, then a fold | a conditional write on the chunk |
+|                         | Per-edit records                                | Whole-chunk delta (chosen)        |
+| ----------------------- | ----------------------------------------------- | --------------------------------- |
+| Write per placed block  | ~8 bytes                                        | the chunk's delta, ~1 KiB typical |
+| Stored after compaction | every edit ever made, unless someone folds them | the current delta only            |
+| Join cost               | replay the edits of every chunk in view         | one value per edited chunk        |
+| Concurrent edits        | need an ordering, then a fold                   | a conditional write on the chunk  |
 
 Per-edit records are cheaper to write, but someone has to fold them into a
 current state and nothing in this design runs continuously to do it. A whole
@@ -143,13 +143,13 @@ Region coordinates are offset by `0x8000` so they stay unsigned. The prefix
 
 ### Felix resources per world
 
-| Resource | Felix kind | Name | Notes |
-|---|---|---|---|
-| Chunks | Log-backed cache, one shard | `blocks.chunks.<world>` | One key per edited chunk. No TTL. Compacts |
-| Presence | In-memory stream | `blocks.presence.<world>` | Positions, at most once, 10 per second per player |
-| Online | Cache with a TTL | `blocks.online.<world>` | One entry per session: name, colour, skin. 30 second TTL |
-| World info | Cache, read only to players | `blocks.info.<world>` | Seed, generator version, size, spawn point, written by `blocks-tool` |
-| Chat | Durable stream, `stamp_sender` | `blocks.chat.<world>` | Short messages with a verified sender |
+| Resource   | Felix kind                     | Name                      | Notes                                                                |
+| ---------- | ------------------------------ | ------------------------- | -------------------------------------------------------------------- |
+| Chunks     | Log-backed cache, one shard    | `blocks.chunks.<world>`   | One key per edited chunk. No TTL. Compacts                           |
+| Presence   | In-memory stream               | `blocks.presence.<world>` | Positions, at most once, 10 per second per player                    |
+| Online     | Cache with a TTL               | `blocks.online.<world>`   | One entry per session: name, colour, skin. 30 second TTL             |
+| World info | Cache, read only to players    | `blocks.info.<world>`     | Seed, generator version, size, spawn point, written by `blocks-tool` |
+| Chat       | Durable stream, `stamp_sender` | `blocks.chat.<world>`     | Short messages with a verified sender                                |
 
 The gateway's scope is the world name, so a session's token reaches one world
 and nothing else.
@@ -259,6 +259,7 @@ block whatever it sends. Presence and chat are open to both.
   It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the shader repeats the tile across it, as described below.
 
   The page asks for a chunk with `Mesher.request` (`web/src/mesher.ts`), giving the chunk and its neighbours and a priority, the squared distance from the player. Each worker loads `core` once, meshes one chunk at a time and moves the arrays back without copying them. The nearest chunk goes first, and a chunk that changes again before its job starts is meshed once. Meshing a chunk takes about a millisecond, so one worker keeps up with walking. The pool is for bursts: joining a world, or a view distance of 12 chunks, is thousands of chunks at once, which on the page would be seconds of meshing.
+
 - **One shader patch for the atlas.** A merged quad is longer than one tile, so each vertex carries its tile and its position in tile units, which runs past 1 across the quad. The fragment shader keeps the fraction, maps it into the tile's rectangle in the atlas, and takes the mip level from the unwrapped coordinate. The wrapped one jumps back to 0 at every tile edge, which would pick the smallest mip there and draw a line. `web/src/terrain.ts` applies the patch to Three's own materials, so lighting, fog and shadows work as usual, and the shadow depth material gets it too so leaves cast their holes.
 - **One texture atlas** built at load time from the block textures, with nearest-neighbour filtering and mipmaps padded so edges do not bleed.
 - **Draw order**: opaque and cutout blocks (leaves) first, then glass, then water, each as its own mesh per chunk.
@@ -266,16 +267,18 @@ block whatever it sends. Presence and chat are open to both.
 - **Players** as blocky characters with their name above them.
 - **View distance tiers**, 4 to 12 chunks, picked from the frame time. The target is 60 fps at 8 chunks on a laptop iGPU.
 
+  `ViewDistance` (`web/src/view-distance.ts`) takes each frame's time and answers with a tier. It averages 30 frames, and no single frame counts for more than three budgets, so a hitch or a tab switch does not move the tier. A mean more than 10% over the 16.7 ms budget means the frame rate is slipping, and it steps down at once: one tier for a small overrun, or straight to the tier that should fit when the frames are far over, since the cost follows the square of the distance. After a step up it ignores frames until the new chunks have loaded, and at least 20 more; a step down only unloads, so it ignores none. It steps up one tier only when two things hold: the mean has been at budget for 5 seconds, and at least the wait (15 seconds) has passed since the last step up. Climbing the whole range, 4 to 12, therefore takes about two minutes. If a step up has to be undone within the wait, the wait doubles, up to 2 minutes, so a machine that sits on the edge settles instead of flapping; a step up that holds for the whole wait halves it again. Fog ends one chunk inside the loaded area, so the edge never shows.
+
 ### Assets
 
 Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 
-| Pack | What it gives | Use |
-|---|---|---|
-| [Voxel Pack](https://kenney.nl/assets/voxel-pack) (190 assets) | Block textures and tiles | The block atlas |
-| [Block Pack](https://kenney.nl/assets/block-pack) (100 assets) | 3D blocks | Palette previews, the logo and store art |
-| [Blocky Characters](https://kenney.nl/assets/blocky-characters) (20 assets) | Low-poly characters | Other players |
-| [Survival Kit](https://kenney.nl/assets/survival-kit) (80 assets) | Props: tools, tents, crates | Held items, decoration |
+| Pack                                                                        | What it gives               | Use                                      |
+| --------------------------------------------------------------------------- | --------------------------- | ---------------------------------------- |
+| [Voxel Pack](https://kenney.nl/assets/voxel-pack) (190 assets)              | Block textures and tiles    | The block atlas                          |
+| [Block Pack](https://kenney.nl/assets/block-pack) (100 assets)              | 3D blocks                   | Palette previews, the logo and store art |
+| [Blocky Characters](https://kenney.nl/assets/blocky-characters) (20 assets) | Low-poly characters         | Other players                            |
+| [Survival Kit](https://kenney.nl/assets/survival-kit) (80 assets)           | Props: tools, tents, crates | Held items, decoration                   |
 
 The style frame uses the Voxel Pack and Blocky Characters from
 `web/assets/`, which the client loads the same way. [docs/art.md](art.md) has
@@ -284,16 +287,16 @@ the palette and the restyling. The client builds the atlas from them when it loa
 
 ## Build order
 
-| Milestone | Proves |
-|---|---|
-| The look, locked: asset pipeline, block atlas, greedy meshing, style frame, view distance tiers | It looks good at 60 fps before Felix is involved |
-| A world you can edit, solo, through Felix: `core`, the dev stack, `blocks-tool`, chunk values, offline mode | Demonstrations 2, 3 and 5 for one player |
-| Multiplayer: conditional chunk writes, presence, the online list, chat | Demonstration 1, the headline |
-| A world that lasts: compaction proof, rejoin by offset, world export and import | Demonstration 4 |
-| Worlds with owners: builders and visitors, opening a solo world to friends | Demonstrations 5 and 6 |
-| Region watches: watch only the regions around the player | Join cost bounded by view, not world size |
-| Scale: 50 players in a world, bots, broker restart and failover | It holds under load and loss |
-| Self-hosting: images, compose, Helm, releases | Anyone can run it |
+| Milestone                                                                                                   | Proves                                           |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| The look, locked: asset pipeline, block atlas, greedy meshing, style frame, view distance tiers             | It looks good at 60 fps before Felix is involved |
+| A world you can edit, solo, through Felix: `core`, the dev stack, `blocks-tool`, chunk values, offline mode | Demonstrations 2, 3 and 5 for one player         |
+| Multiplayer: conditional chunk writes, presence, the online list, chat                                      | Demonstration 1, the headline                    |
+| A world that lasts: compaction proof, rejoin by offset, world export and import                             | Demonstration 4                                  |
+| Worlds with owners: builders and visitors, opening a solo world to friends                                  | Demonstrations 5 and 6                           |
+| Region watches: watch only the regions around the player                                                    | Join cost bounded by view, not world size        |
+| Scale: 50 players in a world, bots, broker restart and failover                                             | It holds under load and loss                     |
+| Self-hosting: images, compose, Helm, releases                                                               | Anyone can run it                                |
 
 **The look comes first on purpose**, for the reason felix-arena and felix-metro give:
 looking good is the requirement most likely to fail late, so the look is fixed

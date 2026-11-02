@@ -1,6 +1,8 @@
 // The chunk test scene: a made-up world meshed in the worker and drawn the way the game draws it, while the camera
 // walks across chunk boundaries. scripts/check-chunks.mjs reads window.__chunksResult once window.__ready is true.
-// ?inline=1 meshes on the page instead, to show what the worker saves.
+// ?inline=1 meshes on the page instead, to show what the worker saves. ?adapt=1 lets the frame time choose the view
+// distance, starting at 8, and shows the debug panel; ?tier=N holds the view distance at N chunks; ?debug=1 shows the
+// panel; ?slow=N adds N ms of work to every frame, to make it step down.
 import * as THREE from 'three';
 import { atlasTexture, buildAtlas } from './atlas';
 import { loadTiles } from './assets';
@@ -9,8 +11,10 @@ import { loadBlockTable } from './core';
 import { createFixtureWorld } from './fixture-world';
 import { Mesher } from './mesher';
 import { loadMesher, meshChunk, meshedHere } from './meshing';
+import { DebugOverlay } from './debug-overlay';
 import { createLook } from './scene';
 import { terrainMaterials, warmUp } from './terrain';
+import { fogFor, MAX_TIER, MIN_TIER, ViewDistance } from './view-distance';
 
 interface Result {
   mode: 'worker' | 'inline';
@@ -25,6 +29,10 @@ interface Result {
   /** Chunks in range of the last position that have a result to draw, and how many of them are drawn. */
   wanted: number;
   drawn: number;
+  /** The view distance at the start and after each change. */
+  tiers: number[];
+  /** The debug panel's text at the end. */
+  panel: string;
   failures: string[];
 }
 
@@ -35,7 +43,13 @@ declare global {
   }
 }
 
-const inline = new URLSearchParams(location.search).get('inline') === '1';
+const params = new URLSearchParams(location.search);
+const inline = params.get('inline') === '1';
+const held = Number(params.get('tier') ?? NaN);
+const fixedTier = Number.isFinite(held) ? Math.max(MIN_TIER, Math.min(MAX_TIER, Math.round(held))) : null;
+// A held distance wins over adapting.
+const adapt = params.get('adapt') === '1' && fixedTier === null;
+const slow = Number(params.get('slow') ?? 0);
 const result: Result = {
   mode: inline ? 'inline' : 'worker',
   chunks: 0,
@@ -45,6 +59,8 @@ const result: Result = {
   onPage: { calls: 0, ms: 0 },
   wanted: 0,
   drawn: 0,
+  tiers: [],
+  panel: '',
   failures: [],
 };
 
@@ -111,7 +127,15 @@ async function run() {
   );
 
   const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
-  const RADIUS = 4;
+  // Fixed at 4 chunks unless asked otherwise, so the same walk loads the same chunks every time.
+  const distance = new ViewDistance({ start: fixedTier ?? (adapt ? 8 : 4) });
+  const overlay = new DebugOverlay();
+  overlay.toggle(adapt || params.get('debug') === '1');
+  const recent: number[] = [];
+  const fog = scene.fog as THREE.Fog;
+  const applyTier = () => Object.assign(fog, fogFor(distance.tier));
+  applyTier();
+  result.tiers.push(distance.tier);
   const eye = (x: number, z: number) => new THREE.Vector3(x, world.surface(x, z) + 1 + 1.62 + 4, z);
   const look_at = new THREE.Vector3(64, 21, 64);
   const place = (z: number) => {
@@ -122,33 +146,59 @@ async function run() {
 
   // Load what is around the start, then walk toward the house so new chunks stream in at every boundary.
   place(112);
-  view.update(camera.position, RADIUS);
+  view.update(camera.position, distance.tier);
   while (view.pending > 0) await frame();
   warmUp(renderer, scene, camera, materials);
   // The first frame uploads everything loaded so far, which is the loading screen's job and not the walk's.
   renderer.render(scene, camera);
   await frame();
 
+  // One frame's bookkeeping, for the walk and for the live page after it. True if the view distance moved.
+  const tick = (delta: number) => {
+    recent.push(delta);
+    if (recent.length > 30) recent.shift();
+    const changed = adapt && distance.record(delta, view.pending) !== null;
+    if (changed) applyTier();
+    overlay.update({
+      tier: distance.tier,
+      fps: 1000 / (recent.reduce((a, b) => a + b, 0) / recent.length),
+      loaded: view.loadedChunks,
+      meshing: view.pending,
+      changes: distance.changes,
+    });
+    return changed;
+  };
+  const busy = () => {
+    for (const start = performance.now(); performance.now() - start < slow; );
+  };
+
   let frames = 0;
+  let last = await frame();
   for (let z = 112; z >= 80; z -= 0.4) {
     place(z);
-    view.update(camera.position, RADIUS);
+    view.update(camera.position, distance.tier);
     renderer.render(scene, camera);
-    await frame();
+    busy();
+    const now = await frame();
     frames++;
+    const delta = now - last;
+    last = now;
+    if (tick(delta)) result.tiers.push(distance.tier);
   }
   while (view.pending > 0) await frame();
   place(80);
-  view.update(camera.position, RADIUS);
+  view.update(camera.position, distance.tier);
   while (view.pending > 0) await frame();
   renderer.render(scene, camera);
 
   result.chunks = view.stats.meshed;
   result.frames = frames;
+  result.panel = overlay.element.textContent ?? '';
   result.applyMs = summary(view.stats.applyMs);
   result.meshMs = summary(view.stats.meshMs);
   result.onPage = { calls: meshedHere.calls, ms: meshedHere.ms };
   // Everything within range of where the walk ended has to be on screen, however the requests raced on the way.
+  const RADIUS = distance.tier;
   const [px, pz] = [Math.floor(camera.position.x / 16), Math.floor(camera.position.z / 16)];
   for (let cz = pz - RADIUS; cz <= pz + RADIUS; cz++)
     for (let cx = px - RADIUS; cx <= px + RADIUS; cx++)
@@ -162,12 +212,18 @@ async function run() {
   if (view.stats.meshed === 0) result.failures.push('no chunk was meshed');
   if (view.loadedChunks === 0) result.failures.push('nothing was drawn');
 
-  // The scripted walk is over, so the camera stays where it ended; the page keeps drawing for anyone looking at it.
-  const live = () => {
+  // The scripted walk is over, so the camera stays where it ended. The page keeps drawing, and keeps adapting and
+  // updating the panel for anyone looking at it; the result above is already final and is not touched again.
+  let prev = 0;
+  const live = (now: number) => {
+    // The first frame after the walk's waiting loops has no meaningful delta.
+    if (prev > 0 && tick(now - prev)) view.update(camera.position, distance.tier);
+    prev = now;
     renderer.render(scene, camera);
+    busy();
     requestAnimationFrame(live);
   };
-  live();
+  requestAnimationFrame(live);
 }
 
 const status = document.getElementById('status')!;
