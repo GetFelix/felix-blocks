@@ -31,3 +31,8 @@ test('only the last four changes are listed', () => {
   expect(lines).toHaveLength(3 + 4);
   expect(lines[3]).toContain('2 to 3');
 });
+
+test('a frame rate that is not a number is not printed as one', () => {
+  for (const fps of [Infinity, NaN, 0])
+    expect(overlayLines({ tier: 8, fps, loaded: 0, meshing: 0, changes: [] })[1]).toBe('-- fps');
+});

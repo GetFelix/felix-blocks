@@ -4,16 +4,16 @@ Felix Blocks should look like a sunny afternoon in a world you made: bright, cle
 and friendly, with enough shading that the blocks read as solid things and not
 flat tiles. The reference is [prototype/style-frame.html](../prototype/style-frame.html).
 
-| First person | Night | Overview |
-|---|---|---|
+| First person                                              | Night                                       | Overview                                          |
+| --------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
 | ![First person](screenshots/style-frame-first-person.jpg) | ![Night](screenshots/style-frame-night.jpg) | ![Overview](screenshots/style-frame-overview.jpg) |
 
 ## Assets
 
-| Pack | Used for | Notes |
-|---|---|---|
-| Voxel Pack | Block textures, plants | 128 px tiles, flat cartoon shading, one family |
-| Blocky Characters | Other players | Rigged GLB with `idle`, `walk`, `interact-right` and more; faces +z; scaled to 1.8 blocks |
+| Pack              | Used for               | Notes                                                                                     |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| Voxel Pack        | Block textures, plants | 128 px tiles, flat cartoon shading, one family                                            |
+| Blocky Characters | Other players          | Rigged GLB with `idle`, `walk`, `interact-right` and more; faces +z; scaled to 1.8 blocks |
 
 The files are in `web/assets/`, with `CREDITS.md` listing each pack's source and
 licence. The block table in `core/src/blocks.rs` says which tile each face of
@@ -25,14 +25,14 @@ on a transparent background, such as `rock_moss`, cannot be cube faces.
 
 ## Palette
 
-| Role | Colour | Why |
-|---|---|---|
-| Grass | `rgb(102, 174, 62)` | Kenney's grass is a cool mint; this is warmed toward the green in the logo |
-| Leaves | `rgb(66, 146, 58)` | Darker than grass so trees separate from the ground behind them |
-| Sky, zenith to horizon | `#3f93dc` to `#cfe8f6` | Clear midday; the horizon colour is also the fog colour, so the world fades into the sky instead of ending |
-| Selection and accents | `hsl(192, 90%, 46%)` | Felix cyan. It is the only saturated blue-green in the scene, so the outline is always the thing you see |
-| UI panels | `rgba(12, 20, 28, 0.62)` with blur | Dark glass reads on both sky and grass |
-| Player colours | coral `#ff7a59`, violet `#a37cf0` | Warm and cool, both far from green and from the cyan |
+| Role                   | Colour                             | Why                                                                                                        |
+| ---------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Grass                  | `rgb(102, 174, 62)`                | Kenney's grass is a cool mint; this is warmed toward the green in the logo                                 |
+| Leaves                 | `rgb(66, 146, 58)`                 | Darker than grass so trees separate from the ground behind them                                            |
+| Sky, zenith to horizon | `#3f93dc` to `#cfe8f6`             | Clear midday; the horizon colour is also the fog colour, so the world fades into the sky instead of ending |
+| Selection and accents  | `hsl(192, 90%, 46%)`               | Felix cyan. It is the only saturated blue-green in the scene, so the outline is always the thing you see   |
+| UI panels              | `rgba(12, 20, 28, 0.62)` with blur | Dark glass reads on both sky and grass                                                                     |
+| Player colours         | coral `#ff7a59`, violet `#a37cf0`  | Warm and cool, both far from green and from the cyan                                                       |
 
 Grass, leaves and plants are recoloured by brightness, the way a biome tint
 works, so the tile's texture stays and only the hue changes. Stone is slightly
@@ -93,18 +93,29 @@ Not done yet: the sky light that darkens caves and eaves, and plants.
 ### View distance and the debug panel
 
 The view distance, 4 to 12 chunks, follows the frame time (see
-[design.md](design.md#rendering)). `/chunks.html?adapt=1` starts at 8 chunks and
-shows a panel with the distance, the frame rate, the chunks loaded and the last
-changes; `?debug=1` shows the panel alone and F3 toggles it. `?slow=40` adds 40
-ms of work to each frame, which makes the distance step down, as in the picture:
-the fog closes in with it.
+[design.md](design.md#rendering)). The chunks page takes these options:
+
+- `?adapt=1` starts at 8 chunks and lets the frame time move it. It shows the panel.
+- `?tier=8` holds the distance at 8 chunks (any whole number from 4 to 12) and never moves it.
+- `?debug=1` shows the panel, with the distance, the frame rate, the chunks loaded and the last changes. F3 toggles it.
+- `?slow=40` adds 40 ms of work to each frame, which makes the distance step down, as in the picture: the fog closes
+  in with it.
+
+The panel keeps updating after the scripted walk ends, so you can leave the page open and watch it.
 
 ![The debug panel after a step down from 8 to 4 chunks](screenshots/view-distance-panel.jpg)
 
-CI runs that case and fails if the distance does not come down or the panel does
-not say so. Whether a laptop iGPU holds 60 fps at 8 chunks is not something
-headless Chromium can answer, because it renders in software. It has to be
-measured on the hardware, with the panel.
+CI loads the `?adapt=1&slow=40` case and fails if the distance does not come down or the panel does not say so. That
+shows a step down happens under 40 ms frames. It does not show that the controller follows the frame time in both
+directions; the unit tests in `web/src/view-distance.test.ts` cover that. Whether a laptop iGPU holds 60 fps at 8
+chunks is not something headless Chromium can answer, because it renders in software. It has to be measured on the
+hardware:
+
+1. On a laptop with an integrated GPU, serve the site (`npm run dev` in `web/`) and open
+   `/chunks.html?tier=8&debug=1`.
+2. Let the walk finish and read `fps` in the panel. It should stay at 60.
+3. Open `/chunks.html?adapt=1` to see where the distance settles. It starts at 8, steps down if the frames are late,
+   and climbs back one tier at a time if they are not.
 
 ## Night
 
@@ -127,11 +138,11 @@ see what you are building.
 Serve the repository root (`python3 -m http.server`) and open
 `/prototype/style-frame.html`. Drag to look around.
 
-| Parameter | Effect |
-|---|---|
+| Parameter        | Effect                             |
+| ---------------- | ---------------------------------- |
 | `?view=overview` | The wide shot, with orbit controls |
-| `?time=night` | The night version of either view |
-| `?ui=0` | Hide the overlay |
+| `?time=night`    | The night version of either view   |
+| `?ui=0`          | Hide the overlay                   |
 
 The screenshots above are the default view, `?time=night` and `?view=overview`
 at 1600 × 900.

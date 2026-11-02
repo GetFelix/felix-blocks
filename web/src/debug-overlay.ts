@@ -13,11 +13,9 @@ export interface Readings {
 
 /** The panel's lines, so a test can read them without a browser. */
 export function overlayLines({ tier, fps, loaded, meshing, changes }: Readings): string[] {
-  const lines = [`view ${tier} chunks`, `${fps.toFixed(0)} fps`, `${loaded} loaded, ${meshing} meshing`];
-  for (const c of changes.slice(-4)) {
-    const why = c.reason === 'slow' ? 'slow' : 'steady';
-    lines.push(`${c.from} to ${c.to}: ${why}, ${c.meanMs.toFixed(1)} ms`);
-  }
+  const rate = Number.isFinite(fps) && fps > 0 ? fps.toFixed(0) : '--';
+  const lines = [`view ${tier} chunks`, `${rate} fps`, `${loaded} loaded, ${meshing} meshing`];
+  for (const c of changes.slice(-4)) lines.push(`${c.from} to ${c.to}: ${c.reason}, ${c.meanMs.toFixed(1)} ms`);
   return lines;
 }
 

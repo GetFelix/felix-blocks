@@ -15,8 +15,13 @@ const SETTLE = 20;
 const SLIP = 1.1;
 /** How long the frame time must hold at the budget before trying one tier further. */
 const STEADY_MS = 5000;
-/** The first wait after a step up that had to be undone, doubled each time it happens again. */
+/** The wait between step ups. A step up that has to be undone doubles it, a step up that held halves it again. */
 const BACKOFF_MS = 15000;
+const BACKOFF_MAX_MS = 120000;
+/** A late frame counts as this many budgets at most, so one hitch or a tab switch cannot move the tier. */
+const CLAMP = 3;
+/** Frames a step up may keep waiting for its chunks to load; walking never stops the loading queue, so it is bounded. */
+const LOAD_CAP = 600;
 
 export interface TierChange {
   /** Milliseconds of frames recorded when it happened. */
@@ -41,9 +46,14 @@ export class ViewDistance {
   private current: number;
   private frames: number[] = [];
   private settle = SETTLE;
+  /** True after a step up, until the new chunks are in. A step down only unloads, so it has nothing to wait for. */
+  private loading = false;
+  private held = 0;
   private elapsed = 0;
   private steadyFor = 0;
   private lastStepUp = -Infinity;
+  /** The last step up has not yet been undone or held for a full wait. */
+  private onTrial = false;
   private wait = BACKOFF_MS;
 
   constructor({ start = 8, min = MIN_TIER, max = MAX_TIER }: ViewDistanceOptions = {}) {
@@ -56,11 +66,22 @@ export class ViewDistance {
     return this.current;
   }
 
-  /** Feeds one frame's time. Returns the change if the tier moved. */
-  record(frameMs: number): TierChange | null {
+  /** The wait between step ups right now. */
+  get retryAfterMs(): number {
+    return this.wait;
+  }
+
+  /**
+   * Feeds one frame's time and, if known, the number of chunks still loading. Returns the change if the tier moved.
+   * A frame time that is not a positive number is ignored.
+   */
+  record(rawMs: number, pending = 0): TierChange | null {
+    if (!Number.isFinite(rawMs) || rawMs <= 0) return null;
+    const frameMs = Math.min(rawMs, BUDGET_MS * CLAMP);
     this.elapsed += frameMs;
     if (this.settle > 0) {
-      this.settle--;
+      const waiting = this.loading && pending > 0 && ++this.held < LOAD_CAP;
+      if (!waiting) this.settle--;
       return null;
     }
     this.frames.push(frameMs);
@@ -73,14 +94,18 @@ export class ViewDistance {
       const fits = Math.floor(this.current * Math.sqrt(BUDGET_MS / mean));
       const to = Math.max(this.min, Math.min(this.current - 1, fits));
       if (to === this.current) return null;
-      // A step up that did not hold: wait longer before the next one.
-      if (this.elapsed - this.lastStepUp < this.wait) this.wait *= 2;
+      // A step up that did not hold: wait longer before the next one. Undoing it over two tiers counts once.
+      if (this.onTrial && this.elapsed - this.lastStepUp < this.wait)
+        this.wait = Math.min(BACKOFF_MAX_MS, this.wait * 2);
+      this.onTrial = false;
       return this.move(to, 'slow', mean);
     }
 
     this.steadyFor += frameMs;
     const rested = this.elapsed - this.lastStepUp >= this.wait;
     if (this.steadyFor >= STEADY_MS && rested && this.current < this.max) {
+      if (this.onTrial) this.wait = Math.max(BACKOFF_MS, this.wait / 2);
+      this.onTrial = true;
       this.lastStepUp = this.elapsed;
       return this.move(this.current + 1, 'steady', mean);
     }
@@ -92,7 +117,9 @@ export class ViewDistance {
     this.current = to;
     this.changes.push(change);
     this.frames = [];
-    this.settle = SETTLE;
+    this.loading = reason === 'steady';
+    this.held = 0;
+    this.settle = this.loading ? SETTLE : 0;
     this.steadyFor = 0;
     return change;
   }
