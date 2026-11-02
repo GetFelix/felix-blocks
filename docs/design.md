@@ -310,7 +310,7 @@ before anything is built inside it.
 
 Checked against Felix's cache docs and felix-gateway's protocol and source.
 
-1. **No conditional writes through the gateway.** Felix has `cache_put_if` and `cache_get_versioned`, but the gateway relays only `cache_put`, `cache_get`, `cache_delete` and `cache_watch`, and none of its messages carry a version. Without it, two players writing one chunk is last write wins. The solo world can live with that; multiplayer needs it. The fallback is an edit stream whose log order decides, folded by every client.
+1. **Watch changes carry no version.** The gateway has relayed `cache_put_if` since 0.8.0 (with the `cache_versions` feature), and `cache_get` answers with the entry's version. But `cache_change` and `cache_entries` carry none, so a client that watches a chunk learns its version only by reading the key again with `cache_get`. Until the watch reports versions, every refused write and every change to a chunk the player is editing costs one read ([felix-blocks#48](https://github.com/GetFelix/felix-blocks/issues/48)).
 2. **The gateway's cache watch is the whole cache.** It always watches every key, so there is no key or prefix watch from a browser. Joining a world downloads every edited chunk in it. Fine for small worlds, and the reason region watches are their own milestone.
 3. **The gateway's cache watch cannot resume.** `cache_change` carries no offset and `cache_watch` takes no `from_offset`, so a client that reconnects downloads the whole world again instead of what it missed.
 4. **The gateway's cache watch needs a single-shard cache.** It opens a prefix watch without naming a shard, which Felix refuses on a multi-shard cache. World caches stay at one shard until it watches every shard.

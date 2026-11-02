@@ -103,11 +103,27 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --locked
 
+  # Felix, its control plane and the gateway from dev/compose.yml, and a join through the gateway: sign in, read and
+  # write a chunk key conditionally, see another player's change.
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: dev/up.sh
+      - run: node dev/check-join.mjs
+      - if: failure()
+        run: docker compose -f dev/compose.yml logs
+      - if: always()
+        run: dev/down.sh
+
   # The one check main requires, so a job added later is covered without changing the ruleset.
   ci-ok:
     name: CI ok
     if: always()
-    needs: [web, rust-fmt, rust-clippy, rust-test]
+    needs: [web, rust-fmt, rust-clippy, rust-test, stack]
     runs-on: ubuntu-latest
     steps:
       - run: |
