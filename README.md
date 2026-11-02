@@ -11,20 +11,89 @@ visit without being able to change anything. There is no game server: the
 browsers write the world, and Felix stores it, orders the writes and tells
 everyone what changed.
 
-> **Status:** design stage. The [style frame](prototype/style-frame.html) shows
-> the look, day and night. The project's code is started: the block table,
-> the asset pipeline, meshing, terrain generated from a seed, the keys and
-> values chunks are stored under, `blocks-tool`, which creates a world in
-> Felix, walking around that terrain in first person, and digging and placing
-> blocks that are saved to a Felix world. The plan is in
-> [docs/design.md](docs/design.md) and the work is tracked in
+> **Status:** early. You can walk around a generated world in first person, dig
+> and place blocks, and keep the world in Felix or in your browser. Players do
+> not see each other yet. The plan is in [docs/design.md](docs/design.md) and
+> the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
 | Day                                                                                             | Night                                                                                      |
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | ![Felix Blocks style frame, first person by day](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, first person at night](docs/screenshots/style-frame-night.jpg) |
 
-## Run it
+## Install a release
+
+Every [release](https://github.com/GetFelix/felix-blocks/releases) ships the
+built game, so you can play without Node or Rust. You need `python3` and either
+the [GitHub CLI](https://cli.github.com/) (`gh`) or `curl`. Each file has a
+`.sha256` beside it; the commands below check it before anything is unpacked.
+
+### Play in your browser, with no Felix
+
+```bash
+gh release download v0.1.0 -R GetFelix/felix-blocks -p 'felix-blocks-web-v0.1.0.tar.gz*'
+shasum -a 256 -c felix-blocks-web-v0.1.0.tar.gz.sha256
+tar xzf felix-blocks-web-v0.1.0.tar.gz
+cd felix-blocks-web-v0.1.0
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Without `gh`, download any release file, and its `.sha256`, with
+`curl -LO https://github.com/GetFelix/felix-blocks/releases/download/v0.1.0/<file name>`.
+
+Then open these in a browser:
+
+- <http://localhost:8000/play.html?offline=mine> is the game. It makes a world called `mine` in
+  your browser the first time and keeps it there, so it is still there after a reload. Click the
+  page to look around, walk with WASD, jump with space, fly with F, dig with the left button and
+  place with the right ([all the controls](#run-it-from-source)). Use `&seed=11` on the first visit for a
+  different world.
+- <http://localhost:8000/chunks.html> draws a generated world while a camera walks through it.
+- <http://localhost:8000/> lists every block texture and character.
+
+A static server is enough because offline play never talks to Felix. Stop the server with
+Ctrl-C when you are done.
+
+### Save a world in Felix
+
+This keeps the world on a Felix broker on your machine. It needs Docker or Podman with Compose v2
+(or podman-compose 1.4 or later), ports 5000/udp, 8080, 8443, 8787 and 9400 free, and the web
+server above still running. In another terminal, set `PLATFORM` to `linux-x86_64` or `macos-arm64`, whichever matches your machine:
+
+```bash
+PLATFORM=macos-arm64
+gh release download v0.1.0 -R GetFelix/felix-blocks \
+  -p 'felix-blocks-compose-v0.1.0.tar.gz*' -p "blocks-tool-v0.1.0-${PLATFORM}.tar.gz*"
+for f in *.sha256; do shasum -a 256 -c "$f"; done
+tar xzf felix-blocks-compose-v0.1.0.tar.gz
+tar xzf "blocks-tool-v0.1.0-${PLATFORM}.tar.gz"
+cd felix-blocks-compose-v0.1.0
+./up.sh
+```
+
+`./up.sh` starts Felix 0.6.2, its control plane, a stand-in sign-in provider and felix-gateway
+0.8.0 from the published images, and waits until they are ready. Then make a world, sign in as its
+owner and open the game on it:
+
+```bash
+export BLOCKS_ISSUER=http://127.0.0.1:9400 \
+  BLOCKS_FELIX_TOKEN_FILE=state/admin.token \
+  BLOCKS_FELIX_DATA_TOKEN_FILE=state/admin-data.token \
+  BLOCKS_FELIX_CA_FILE=state/broker-cert.pem
+"../blocks-tool-v0.1.0-${PLATFORM}/blocks-tool" create play --owner ana --seed 7
+TOKEN=$(curl -s 'http://127.0.0.1:9400/token?sub=ana&aud=felix-blocks' \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["id_token"])')
+echo "http://localhost:8000/play.html?gateway=ws://127.0.0.1:8787/ws&world=play&token=$TOKEN"
+```
+
+Open the URL it prints. Blocks you dig and place are saved to the world `play` in Felix and are
+there when you open the page again with a fresh token. To let a second player in, run `create play
+--owner ben` and sign in as `ben`. `./down.sh` stops the stack and deletes its data.
+
+`blocks-tool` is not signed. A browser download of it on macOS needs
+`xattr -d com.apple.quarantine blocks-tool`; downloading with `gh` or `curl` does not.
+
+## Run it from source
 
 You can walk around a generated world and change it. The play page
 (`/play.html`) drops you into a world made from a seed (`?seed=7` by default) and starts you on dry ground near its middle.
@@ -245,7 +314,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                                                                                                                                    |
 | Region watches             | Joining costs what you can see, not the whole world                              | Planned                                                                                                                                                                                                                                                    |
 | Scale and failover         | 50 players, broker restarts and failover                                         | Planned                                                                                                                                                                                                                                                    |
-| Self-hosting               | Anyone can run it                                                                | Planned                                                                                                                                                                                                                                                    |
+| Self-hosting               | Anyone can run it                                                                | Partly: release files and a compose bundle for the dev stack ship; Helm and a production setup are planned                                                                                                                                                 |
 
 ## Repository layout
 

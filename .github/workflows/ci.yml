@@ -173,11 +173,18 @@ jobs:
       - if: always()
         run: dev/down.sh
 
+  # The crates, the web package and the README's release commands name one version, as a release needs.
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/check-release-version.py "v$(jq -r .version web/package.json)"
+
   # The one check main requires, so a job added later is covered without changing the ruleset.
   ci-ok:
     name: CI ok
     if: always()
-    needs: [web, rust-fmt, rust-clippy, rust-test, stack]
+    needs: [web, rust-fmt, rust-clippy, rust-test, stack, versions]
     runs-on: ubuntu-latest
     steps:
       - run: |
