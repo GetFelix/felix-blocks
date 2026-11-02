@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Felix Blocks</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #8fc6e8;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #cross {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        pointer-events: none;
+        background:
+          linear-gradient(#fff, #fff) center / 2px 100% no-repeat,
+          linear-gradient(#fff, #fff) center / 100% 2px no-repeat;
+        mix-blend-mode: difference;
+      }
+      #hint,
+      #status {
+        position: fixed;
+        padding: 6px 12px;
+        border-radius: 10px;
+        background: rgba(12, 20, 28, 0.62);
+        color: #e8eef3;
+        font:
+          500 12px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      #hint {
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+      }
+      #hint.hidden {
+        display: none;
+      }
+      #status {
+        left: 16px;
+        bottom: 16px;
+      }
+      #status.ok {
+        color: hsl(192, 90%, 46%);
+      }
+      #status.fail {
+        color: #ff7a59;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="cross"></div>
+    <div id="hint">
+      Click to look around. WASD walk, space jump, shift sprint, F or double-tap space fly (shift sinks)
+    </div>
+    <div id="status">loading</div>
+    <script type="module" src="/src/play-page.ts"></script>
+  </body>
+</html>

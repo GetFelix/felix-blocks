@@ -30,6 +30,7 @@ export default defineConfig({
         main: fileURLToPath(new URL('index.html', import.meta.url)),
         atlas: fileURLToPath(new URL('atlas.html', import.meta.url)),
         chunks: fileURLToPath(new URL('chunks.html', import.meta.url)),
+        play: fileURLToPath(new URL('play.html', import.meta.url)),
         repeat: fileURLToPath(new URL('repeat.html', import.meta.url)),
       },
     },
