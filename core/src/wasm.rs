@@ -108,6 +108,60 @@ pub fn value_generator_version(value: &[u8]) -> Result<u8, JsError> {
     crate::delta::generator_version(value).map_err(|e| JsError::new(&e.to_string()))
 }
 
+/// [`crate::info::KEY`]: the key the world info is stored under.
+#[wasm_bindgen(js_name = worldInfoKey)]
+pub fn world_info_key() -> String {
+    crate::info::KEY.to_string()
+}
+
+/// A world's info as read from its stored value.
+#[wasm_bindgen]
+pub struct WorldInfo(crate::info::WorldInfo);
+
+#[wasm_bindgen]
+impl WorldInfo {
+    /// [`crate::info::WorldInfo::decode`]. Throws for a value that is not world info.
+    #[wasm_bindgen(js_name = decode)]
+    pub fn decode(value: &[u8]) -> Result<WorldInfo, JsError> {
+        crate::info::WorldInfo::decode(value)
+            .map(WorldInfo)
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// [`crate::info::WorldInfo::new`]: the info of a new world.
+    #[wasm_bindgen(js_name = create)]
+    pub fn create(seed: u32) -> WorldInfo {
+        WorldInfo(crate::info::WorldInfo::new(seed))
+    }
+
+    /// The 24 bytes to store.
+    pub fn encode(&self) -> Vec<u8> {
+        self.0.encode().to_vec()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn seed(&self) -> u32 {
+        self.0.seed
+    }
+
+    #[wasm_bindgen(getter, js_name = generatorVersion)]
+    pub fn generator_version(&self) -> u8 {
+        self.0.generator_version
+    }
+
+    /// Size in chunks: x, y (up) and z.
+    #[wasm_bindgen(getter)]
+    pub fn size(&self) -> Vec<i32> {
+        self.0.size.iter().map(|&n| i32::from(n)).collect()
+    }
+
+    /// Where players start, in blocks: x, y (up) and z.
+    #[wasm_bindgen(getter)]
+    pub fn spawn(&self) -> Vec<i32> {
+        self.0.spawn.to_vec()
+    }
+}
+
 fn pass(index: u8) -> Result<crate::Pass, JsError> {
     match index {
         0 => Ok(crate::Pass::Opaque),
