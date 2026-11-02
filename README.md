@@ -13,8 +13,8 @@ everyone what changed.
 
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
 > the look, day and night; nothing is playable yet. The project's code is
-> started: the block table, the asset pipeline, meshing, and terrain generated
-> from a seed. The plan is in
+> started: the block table, the asset pipeline, meshing, terrain generated
+> from a seed, and the keys and values chunks are stored under. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
