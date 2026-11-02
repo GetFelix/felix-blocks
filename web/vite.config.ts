@@ -1,5 +1,6 @@
 import { cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vitest/config';
 
 // assets/ sits next to index.html, so the dev server serves it as is. A build copies it into dist, with the
@@ -22,6 +23,14 @@ function copyAssets(): Plugin {
 export default defineConfig({
   plugins: [copyAssets()],
   // Vite's own files go in bundle/ so they do not mix with the art copied to assets/.
-  build: { assetsDir: 'bundle' },
+  build: {
+    assetsDir: 'bundle',
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        atlas: fileURLToPath(new URL('atlas.html', import.meta.url)),
+      },
+    },
+  },
   test: { environment: 'node' },
 });
