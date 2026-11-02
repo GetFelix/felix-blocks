@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Felix Blocks tile repeat</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #8fc6e8;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+      #status {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        background: rgba(12, 20, 28, 0.62);
+        color: #e8eef3;
+        font:
+          500 12px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      #status.ok {
+        color: hsl(192, 90%, 46%);
+      }
+      #status.fail {
+        color: #ff7a59;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="view" width="640" height="480"></canvas>
+    <div id="status">loading</div>
+    <script type="module" src="/src/repeat-page.ts"></script>
+  </body>
+</html>

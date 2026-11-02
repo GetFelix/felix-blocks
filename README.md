@@ -25,8 +25,9 @@ everyone what changed.
 
 There is nothing to play yet. What runs today is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
-and the atlas page, which packs the textures into one atlas and shows each at a
-distance.
+the atlas page, which packs the textures into one atlas and shows each at a
+distance, and the chunks page, which draws a made-up world meshed in Web Workers
+while the camera walks through it.
 
 You need Node 22, Rust 1.97 with the `wasm32-unknown-unknown` target (`rustup`
 installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
@@ -36,7 +37,7 @@ installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
 cd web
 npm ci
 npm run core    # build core/ to WebAssembly into src/core
-npm run dev     # the asset page at http://localhost:5173, the atlas at /atlas.html
+npm run dev     # the asset page at http://localhost:5173, then /atlas.html and /chunks.html
 ```
 
 The checks CI runs are `npm run format:check`, `npm run typecheck`, `npm test`
@@ -44,7 +45,8 @@ and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
 `cargo test` at the root. `npm run assets -- <url>` opens a served page in
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
-distance.
+distance. `npm run chunks -- <url>` meshes and draws the made-up world, and
+fails if a merged quad does not look like the separate blocks it replaces.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open
@@ -118,7 +120,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | Milestone | What it proves | State |
 |---|---|---|
-| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas and chunk mesher done |
+| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher and meshing in workers done |
 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |

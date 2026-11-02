@@ -29,6 +29,8 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('index.html', import.meta.url)),
         atlas: fileURLToPath(new URL('atlas.html', import.meta.url)),
+        chunks: fileURLToPath(new URL('chunks.html', import.meta.url)),
+        repeat: fileURLToPath(new URL('repeat.html', import.meta.url)),
       },
     },
   },

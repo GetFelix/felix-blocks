@@ -64,6 +64,25 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
   chunk, latency, slot numbers), cyan for the selected slot and Felix state.
   Hotbar icons are drawn from the same restyled tiles as the world.
 
+## Meshed chunks
+
+`/chunks.html` draws a made-up world (hills, a lake, trees and a house) the way
+the game will: chunks meshed in workers, the atlas on every quad, the sun and
+hemisphere light of the style frame, soft shadows and fog. The camera walks across
+chunk boundaries while new chunks stream in.
+
+![Meshed chunks](screenshots/chunks-worker-meshed.jpg)
+
+Run `npm run dev` in `web/` and open it, or `npm run chunks -- <url>` to check
+it headless. The check fails if the page spends more than 5 ms turning a
+chunk's mesh into scene objects, or if a merged quad does not match the same
+floor drawn as separate blocks. It also draws that floor with the wrong shader
+and fails if it does not see the seams, so it is known to notice them.
+
+Not done yet: the sky light that darkens caves and eaves, and plants. The
+frame time on a laptop iGPU is measured when the view distance tiers land;
+headless Chromium renders in software and cannot say.
+
 ## Night
 
 Night is the same world under a moon: dark but never black, so you can still
