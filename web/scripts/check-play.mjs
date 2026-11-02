@@ -18,7 +18,17 @@ page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
 const state = () => page.evaluate(() => window.__play());
-const shot = (name) => (out ? page.screenshot({ path: `${out}/${name}.png` }) : undefined);
+// Screenshots are only there for a person to look at; no check reads them. Capture waits for a rendered frame, and on a
+// busy software-rendered CI runner that frame can take longer than the default 30 s, so give it two minutes and, if it
+// still does not come, warn instead of failing a run whose assertions held.
+async function shot(name) {
+  if (!out) return;
+  try {
+    await page.screenshot({ path: `${out}/${name}.png`, timeout: 120_000 });
+  } catch (e) {
+    console.warn(`no screenshot ${name}: ${String(e).split('\n')[0]}`);
+  }
+}
 
 /** Waits until `test(state, arg)` holds in the page; says what the player was doing if it never does. */
 async function until(what, test, arg = null) {
@@ -71,7 +81,7 @@ try {
 } catch (e) {
   failure = String(e);
 }
-await shot('end').catch(() => {});
+await shot('end');
 await browser.close();
 if (errors.length) failure = `${failure ? `${failure}; ` : ''}page errors: ${errors.join('; ')}`;
 if (failure) {
