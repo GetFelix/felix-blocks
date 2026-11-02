@@ -134,7 +134,8 @@ upper bound and not the laptop check above. The site came from the `web-dist` ar
 - `/chunks.html?adapt=1`: the distance climbed from 8 to 9, 10 and 11 chunks, each step reported as "steady, 16.7 ms".
   It held 60 fps at 11 chunks, with 3016 chunks loaded and none meshing.
 
-The laptop integrated GPU is still to be timed.
+The laptop target is unverified: no laptop hardware was available. The steps above are how anyone with a laptop can
+check it.
 
 ## Night
 
