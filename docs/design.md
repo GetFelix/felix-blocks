@@ -52,13 +52,13 @@ flowchart LR
     T["blocks-tool<br/>create worlds, grants"] -->|REST| CP
 ```
 
-| Component     | Language                                                   | Holds state?                           | Responsibility                                                                               |
-| ------------- | ---------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Client        | TypeScript, Three.js, `core` as WebAssembly                | A view of the chunks around the player | Generate terrain, apply stored chunk edits, mesh, render, edit, presence                     |
-| Gateway       | [felix-gateway](https://github.com/GetFelix/felix-gateway) | No                                     | Browser transport, token narrowing to one world, write limits                                |
-| Brokers       | Felix                                                      | Yes, authoritative                     | The chunk cache, the presence stream, the online list                                        |
-| Control plane | Felix                                                      | Yes, metadata                          | Token exchange, world resources, roles                                                       |
-| `blocks-tool` | Rust, `core` + control plane REST                          | No                                     | Create a world's caches and streams, grant builders and visitors, inspect and export a world |
+| Component     | Language                                                   | Holds state?                           | Responsibility                                                                                                  |
+| ------------- | ---------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Client        | TypeScript, Three.js, `core` as WebAssembly                | A view of the chunks around the player | Generate terrain, apply stored chunk edits, mesh, render, edit, presence                                        |
+| Gateway       | [felix-gateway](https://github.com/GetFelix/felix-gateway) | No                                     | Browser transport, token narrowing to one world, write limits                                                   |
+| Brokers       | Felix                                                      | Yes, authoritative                     | The chunk cache, the presence stream, the online list                                                           |
+| Control plane | Felix                                                      | Yes, metadata                          | Token exchange, world resources, roles                                                                          |
+| `blocks-tool` | Rust, `core`, control plane REST and `felix-client`        | No                                     | Create a world's caches and streams and write its info, grant builders and visitors, inspect and export a world |
 
 There is no game server. The browsers write the world, Felix stores and
 orders it, and the gateway decides which world a browser may reach.
@@ -200,16 +200,38 @@ tests check all 1,048,576 chunk keys of a world against the gateway's rule.
 
 ### Felix resources per world
 
-| Resource   | Felix kind                     | Name                      | Notes                                                                |
-| ---------- | ------------------------------ | ------------------------- | -------------------------------------------------------------------- |
-| Chunks     | Log-backed cache, one shard    | `blocks.chunks.<world>`   | One key per edited chunk. No TTL. Compacts                           |
-| Presence   | In-memory stream               | `blocks.presence.<world>` | Positions, at most once, 10 per second per player                    |
-| Online     | Cache with a TTL               | `blocks.online.<world>`   | One entry per session: name, colour, skin. 30 second TTL             |
-| World info | Cache, read only to players    | `blocks.info.<world>`     | Seed, generator version, size, spawn point, written by `blocks-tool` |
-| Chat       | Durable stream, `stamp_sender` | `blocks.chat.<world>`     | Short messages with a verified sender                                |
+| Resource   | Felix kind                     | Name                      | Notes                                                                                 |
+| ---------- | ------------------------------ | ------------------------- | ------------------------------------------------------------------------------------- |
+| Chunks     | Log-backed cache, one shard    | `blocks.chunks.<world>`   | One key per edited chunk. No TTL. Compacts                                            |
+| Presence   | In-memory stream               | `blocks.presence.<world>` | Positions, at most once, 10 per second per player                                     |
+| Online     | Cache with a TTL               | `blocks.online.<world>`   | One entry per session: name, colour, skin. 30 second TTL                              |
+| World info | Cache, read only to players    | `blocks.info.<world>`     | One key, `info`: seed, generator version, size, spawn point. Written by `blocks-tool` |
+| Chat       | Durable stream, `stamp_sender` | `blocks.chat.<world>`     | Short messages with a verified sender                                                 |
 
 The gateway's scope is the world name, so a session's token reaches one world
 and nothing else.
+
+### Creating a world
+
+`blocks-tool create <world> --owner <subject> --issuer <url>` makes a world in
+four steps, in this order so that nobody can join a world that has no info:
+
+1. Create the world's caches and streams through the control plane's REST API.
+2. Read the info cache. If it holds a value, keep it (and refuse a `--seed` that
+   differs). If not, write a new one: the seed, the newest generator version,
+   the world's size, and a spawn point on the dry ground nearest the middle.
+3. Add the policies of `role:world-<world>`, which holds what a session in the
+   world needs and no more.
+4. Put the owner in that role. Felix names a person by `sha256(issuer|subject)`,
+   so the tool takes the sign-in provider's issuer URL as well as the subject.
+
+Every step can be repeated: Felix answers 409 for something that exists, and the
+tool takes that as done. The info value is 24 bytes, little endian: format
+(1), generator version, seed (u32), size in chunks (x, y, z as u16) and spawn
+point in blocks (x, y, z as i32). `core/src/info.rs` reads and writes it, so
+the browser and the tool agree on it. The tool calls the control plane as the tenant's
+administrator, and reaches the broker with a second token that is scoped to
+cache reads and writes.
 
 ## The Felix mapping
 
