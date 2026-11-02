@@ -1,6 +1,6 @@
 // Builds in a world saved to Felix, with two players in two pages: what one places is saved, a second page opened
 // afterwards has it, an edit by the second shows up live in the first, and after a reload the first has both.
-// Usage: node scripts/check-edits.mjs <play page url> [world] — the page must be served and the dev stack up
+// Usage: node scripts/check-edits.mjs <play page url> [world]. The page must be served and the dev stack up
 // (dev/up.sh, which also serves the provider that mints the players' tokens); the world is `demo` by default and must let ana and ben in.
 import { chromium } from 'playwright';
 
