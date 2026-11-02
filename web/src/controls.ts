@@ -1,17 +1,25 @@
 // Keyboard and mouse: WASD or the arrows to move, space to jump, shift to sprint, F or a double tap of space to fly,
-// the mouse to look once the canvas has the pointer.
+// the mouse to look once the canvas has the pointer, left click to dig, right click to place, 1 to 9 or the wheel to
+// pick what to place.
 import type { Input } from './player';
 
 const SENSITIVITY = 0.0022;
 const LIMIT = Math.PI / 2 - 0.01;
 /** Two taps of space this close together toggle flying. */
 const DOUBLE_TAP_MS = 300;
+/** How many things the player can pick between. */
+export const SLOTS = 9;
+
+export type Action = 'dig' | 'place';
 
 export class Controls {
   yaw = 0;
   pitch = 0;
   /** Set when the player asks to start or stop flying; read it with `takeFlyToggle`. */
   private fly = 0;
+  /** Which slot is picked, 0 to SLOTS - 1. */
+  slot = 0;
+  private actions: Action[] = [];
   /** A jump pressed and released between two samples still counts. */
   private jumped = false;
   private readonly held = new Set<string>();
@@ -36,6 +44,11 @@ export class Controls {
       this.listen(canvas.ownerDocument, 'mousemove', (e) => {
         if (canvas.ownerDocument.pointerLockElement === canvas) this.look(e as MouseEvent);
       });
+      this.listen(canvas, 'mousedown', (e) => {
+        if (canvas.ownerDocument.pointerLockElement === canvas) this.press(e as MouseEvent);
+      });
+      this.listen(canvas, 'wheel', (e) => this.scroll(e as WheelEvent));
+      this.listen(canvas, 'contextmenu', (e) => e.preventDefault());
     }
   }
 
@@ -62,6 +75,26 @@ export class Controls {
     return odd;
   }
 
+  /** The digs and places asked for since the last call, in order. */
+  takeActions(): Action[] {
+    const actions = this.actions;
+    this.actions = [];
+    return actions;
+  }
+
+  /** A mouse button: the left digs, the right places. */
+  press(e: { button: number; preventDefault?: () => void }): void {
+    if (e.button === 0) this.actions.push('dig');
+    else if (e.button === 2) this.actions.push('place');
+    e.preventDefault?.();
+  }
+
+  /** Moves the pick by the wheel, one slot for each notch. */
+  scroll(e: { deltaY: number; preventDefault?: () => void }): void {
+    if (e.deltaY !== 0) this.slot = (this.slot + (e.deltaY > 0 ? 1 : SLOTS - 1)) % SLOTS;
+    e.preventDefault?.();
+  }
+
   /** Turns the view by a mouse movement, in pixels. */
   look(e: { movementX: number; movementY: number }): void {
     this.yaw -= e.movementX * SENSITIVITY;
@@ -76,6 +109,8 @@ export class Controls {
     if (down) {
       if (!this.held.has(e.code)) {
         // Ctrl+F and Cmd+F are the browser's find.
+        const digit = /^Digit([1-9])$/.exec(e.code);
+        if (digit) this.slot = Number(digit[1]) - 1;
         if (e.code === 'KeyF' && !(e.ctrlKey || e.metaKey || e.altKey)) this.fly++;
         if (e.code === 'Space') {
           this.jumped = true;

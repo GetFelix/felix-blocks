@@ -15,8 +15,8 @@ everyone what changed.
 > the look, day and night. The project's code is started: the block table,
 > the asset pipeline, meshing, terrain generated from a seed, the keys and
 > values chunks are stored under, `blocks-tool`, which creates a world in
-> Felix, and walking around that terrain in first person. Nothing is saved
-> yet. The plan is in
+> Felix, walking around that terrain in first person, and digging and placing
+> blocks that are saved to a Felix world. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
@@ -26,13 +26,29 @@ everyone what changed.
 
 ## Run it
 
-You can walk around a generated world, and nothing more yet. The play page
+You can walk around a generated world and change it. The play page
 (`/play.html`) drops you into a world made from a seed (`?seed=7` by default).
 Click it to look around with the mouse, walk with WASD or the arrows, jump with
 space, sprint with shift, and fly with F or a double tap of space (space rises,
 shift sinks, and landing ends the flight). You walk on the generated terrain,
-swim in water, and cannot pass through blocks. Nothing is saved, and digging
-and placing are not in yet.
+swim in water, and cannot pass through blocks. Left click digs the block you
+look at (up to 6 blocks away), right click places the block picked with 1 to 9
+or the mouse wheel next to it.
+
+By default nothing is saved. To build in a world kept in Felix, start the
+[Felix stack](#the-felix-stack) and open the page with the gateway, the world and
+an ID token for a player of that world:
+
+```bash
+TOKEN=$(curl -s 'http://127.0.0.1:9400/token?sub=ana&aud=felix-blocks' | node -pe 'JSON.parse(require("fs").readFileSync(0)).id_token')
+echo "http://localhost:5173/play.html?gateway=ws://127.0.0.1:8787/ws&world=demo&token=$TOKEN"
+```
+
+Edits show at once and are written to the world's chunk cache every 100 ms,
+one write per changed chunk. The page also watches the cache, so it shows what
+other players build and what you built before. The page's `?seed=` must match the world's seed,
+until the page reads the world info on join. There is no sign-in page yet,
+so the token comes from the development provider.
 
 The rest of what runs is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
@@ -66,7 +82,10 @@ frame time in both directions; the unit tests cover that. `npm run play -- <url
 of play.html>` presses the keys: the player must land, walk, fly up and come
 back down. The physics itself (walls, steps, ceilings, water, chunks that have
 not arrived, and a long walk over real terrain that never ends inside a block)
-is in `web/src/player.test.ts`.
+is in `web/src/player.test.ts`. With the Felix stack up, `npm run edits -- <url of
+play.html>` opens two players in two pages and checks that a placed block is saved,
+that the other player sees it on joining and sees the next edit live, and that
+both are there after a reload.
 
 ### The Felix stack
 
@@ -197,7 +216,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Milestone                  | What it proves                                                                   | State                                                                                                                                                |
 | -------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The look, locked           | It looks good, day and night, before Felix is involved                           | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
-| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | Planned                                                                                                                                              |
+| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | In progress: digging and placing saved to a world through the gateway; join timing and offline mode to do                                            |
 | Multiplayer                | Two players in one chunk never overwrite each other                              | Planned. The gateway relays conditional writes since 0.8.0                                                                                           |
 | A world that lasts         | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned                                                                                                                                              |
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |

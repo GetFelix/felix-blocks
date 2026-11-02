@@ -77,23 +77,7 @@ export class ChunkView {
         for (let cy = 0; cy < this.height; cy++) {
           const key = `${cx},${cy},${cz}`;
           if (this.loaded.has(key) || this.asked.has(key) || this.failed.has(key)) continue;
-          const chunks = this.source(cx, cy, cz);
-          if (!chunks) continue;
-          const request = { cx, cz };
-          this.asked.set(key, request);
-          this.mesher.request(key, chunks, d2).then(
-            (result) => {
-              if (this.asked.get(key) !== request) return;
-              this.asked.delete(key);
-              if (result && this.keep(cx, cz)) this.show(key, [cx, cy, cz], result.data, result.ms);
-            },
-            (error) => {
-              if (this.asked.get(key) !== request) return;
-              this.asked.delete(key);
-              this.failed.add(key);
-              console.error(`meshing chunk ${key} failed`, error);
-            },
-          );
+          this.ask(cx, cy, cz, d2);
         }
       }
     for (const [key, meshes] of this.loaded) {
@@ -104,6 +88,41 @@ export class ChunkView {
         this.loaded.delete(key);
       }
     }
+  }
+
+  /**
+   * Meshes the chunks again after their blocks changed. The old mesh stays up until the new one is ready. Chunks that
+   * are not drawn or asked for are left alone; they are meshed from the new blocks when they come into range.
+   */
+  invalidate(chunks: readonly (readonly [number, number, number])[]): void {
+    for (const [cx, cy, cz] of chunks) {
+      const key = `${cx},${cy},${cz}`;
+      if (!this.loaded.has(key) && !this.asked.has(key)) continue;
+      this.failed.delete(key);
+      const [px, pz] = this.at ?? [cx, cz];
+      this.ask(cx, cy, cz, (cx - px) ** 2 + (cz - pz) ** 2);
+    }
+  }
+
+  private ask(cx: number, cy: number, cz: number, d2: number): void {
+    const key = `${cx},${cy},${cz}`;
+    const chunks = this.source(cx, cy, cz);
+    if (!chunks) return;
+    const request = { cx, cz };
+    this.asked.set(key, request);
+    this.mesher.request(key, chunks, d2).then(
+      (result) => {
+        if (this.asked.get(key) !== request) return;
+        this.asked.delete(key);
+        if (result && this.keep(cx, cz)) this.show(key, [cx, cy, cz], result.data, result.ms);
+      },
+      (error) => {
+        if (this.asked.get(key) !== request) return;
+        this.asked.delete(key);
+        this.failed.add(key);
+        console.error(`meshing chunk ${key} failed`, error);
+      },
+    );
   }
 
   private show(key: string, chunk: [number, number, number], data: Parameters<typeof chunkMeshes>[0], meshMs: number) {
