@@ -312,7 +312,7 @@ generated world first and swapping the edits in would make a player's own
 builds pop in under them, and the answer is quick: 500 edited chunks take in
 within two seconds on a local stack (`npm run load` checks it). If the answer has not come
 after 5 seconds the page draws without it and swaps the edits in when they
-arrive. The player starts at the spawn point, lifted past any blocks players
+arrive. The player is not moved then, so a build at the spawn point can enclose them. The player starts at the spawn point, lifted past any blocks players
 built there.
 
 A stored value that cannot be read as a chunk is skipped and logged to the

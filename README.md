@@ -106,8 +106,9 @@ or Podman with Compose v2 (or podman-compose 1.4 or later), Node 22 for the
 check, and these ports free on localhost: 5000/udp, 8080, 8443, 8787 and 9400.
 It also creates one world, `demo`, that the players `ana` and `ben` may join.
 The world starts empty: its info cache holds nothing until `blocks-tool` writes
-it, and the play page needs the info, so build in a world made with `blocks-tool`. The stack also leaves an administrator's tokens in `dev/state/` for
-`blocks-tool`.
+it, and the play page needs the info, so build in a world made with
+`blocks-tool`. The stack also leaves an administrator's tokens in `dev/state/`
+for `blocks-tool`.
 
 ```bash
 dev/up.sh                  # start the stack and wait until the gateway serves

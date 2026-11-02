@@ -28,6 +28,8 @@ export interface EditSyncOptions {
 const MAX_ATTEMPTS = 5;
 /** How long a chunk whose write failed is left alone, in milliseconds. */
 const BACKOFF_MS = 1000;
+/** Chunks one flush starts, so a big save does not burst far past the gateway's write rate. */
+const PER_FLUSH = 20;
 
 interface Chunk {
   pos: ChunkPos;
@@ -96,7 +98,7 @@ export class EditSync {
     const due = [...this.chunks.values()].filter(
       (chunk) => !chunk.busy && chunk.retryAt <= now && (chunk.stale || chunk.pending.size > 0),
     );
-    await Promise.all(due.map((chunk) => this.step(chunk)));
+    await Promise.all(due.slice(0, PER_FLUSH).map((chunk) => this.step(chunk)));
   }
 
   /**
@@ -160,7 +162,8 @@ export class EditSync {
       const wait = rateLimitWait(error);
       if (wait !== null) {
         // Refused before it reached Felix, so nothing is wrong with the chunk. The edits wait for the gateway's bucket.
-        this.holdUntil = this.now() + wait;
+        this.holdUntil = Math.max(this.holdUntil, this.now() + wait);
+        chunk.maybe = null;
         return;
       }
       this.backoff(chunk);
@@ -259,7 +262,7 @@ export class EditSync {
 function rateLimitWait(error: unknown): number | null {
   const refused = error as { code?: unknown; retryAfterMs?: unknown } | null;
   if (refused?.code !== 'rate_limited') return null;
-  return typeof refused.retryAfterMs === 'number' ? Math.max(refused.retryAfterMs, 50) : BACKOFF_MS;
+  return typeof refused.retryAfterMs === 'number' ? Math.max(refused.retryAfterMs, 250) : BACKOFF_MS;
 }
 
 function chunkAt(key: string): ChunkPos | null {

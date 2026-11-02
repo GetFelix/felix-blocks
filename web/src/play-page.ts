@@ -36,6 +36,8 @@ declare global {
       set(x: number, y: number, z: number, id: number): boolean;
       /** Resolves once every edit has reached Felix. */
       saved(): Promise<void>;
+      /** Whether any edit has not been saved yet. */
+      dirty(): boolean;
       /** Whether the page is saving to a world. */
       saving: boolean;
     };
@@ -70,7 +72,7 @@ function watch(client: GatewayClient, sync: EditSync, timing: NonNullable<Window
   const loaded = new Promise<void>((resolve) => {
     client.onCacheEntries = (cache, entries) => {
       if (cache !== 'chunks') return;
-      timing.entries = performance.now();
+      timing.entries ??= performance.now();
       for (const entry of entries) sync.ingest(entry.key, entry.payload);
       timing.ingested = performance.now();
       resolve();
@@ -97,8 +99,13 @@ async function run() {
   if (gateway && worldName && token) {
     const joined = await join(gateway, worldName, token);
     client = joined.client;
-    if (!joined.info) throw new Error(`world ${worldName} has no info yet: make it with blocks-tool create`);
-    start = readWorldInfo(joined.info);
+    try {
+      if (!joined.info) throw new Error(`world ${worldName} has no info yet: make it with blocks-tool create`);
+      start = readWorldInfo(joined.info);
+    } catch (e) {
+      client.close();
+      throw e;
+    }
     name = worldName;
   } else {
     start = newWorldStart(seed);
@@ -184,6 +191,7 @@ async function run() {
         await new Promise((r) => setTimeout(r, 50));
       }
     },
+    dirty: () => sync.dirty,
     saving: client !== null,
   };
   const showSlots = () => {

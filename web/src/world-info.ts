@@ -17,7 +17,17 @@ export interface WorldStart {
 
 /** The start of a new world made from `seed`, as `blocks-tool create` would make it. `loadGenerator` has to have finished. */
 export function newWorldStart(seed: number): WorldStart {
-  return startOf(WorldInfo.create(seed));
+  return startOf(newInfo(seed));
+}
+
+/** The info value of a new world, as `blocks-tool create` writes it. Throws if the seed is not a whole number from 0 to 2^32 - 1. */
+export function newWorldInfo(seed: number): Uint8Array {
+  return newInfo(seed).encode();
+}
+
+function newInfo(seed: number): WorldInfo {
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`seed ${seed} is not a u32`);
+  return WorldInfo.create(seed);
 }
 
 /**

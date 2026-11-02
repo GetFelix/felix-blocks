@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
 import { WorldInfo } from './core/felix_blocks_core.js';
 import { cellIndex } from './editable-world';
-import { infoKey, newWorldStart, readWorldInfo } from './world-info';
+import { infoKey, newWorldInfo, newWorldStart, readWorldInfo } from './world-info';
 import { createGeneratedWorld, loadGenerator } from './worldgen';
 
 const wasm = readFileSync(new URL('./core/felix_blocks_core_bg.wasm', import.meta.url));
@@ -47,4 +47,10 @@ test('a world of another size or from an unknown generator is refused', () => {
   const version = WorldInfo.create(7).encode();
   version[1] = 200;
   expect(() => readWorldInfo(version)).toThrow(/generator 200/);
+});
+
+test('a seed that is not a u32 is refused', () => {
+  for (const seed of [-1, 1.5, 2 ** 32, Number.NaN]) expect(() => newWorldStart(seed)).toThrow(/not a u32/);
+  expect(() => newWorldInfo(2 ** 32)).toThrow(/not a u32/);
+  expect(newWorldInfo(2 ** 32 - 1)).toHaveLength(24);
 });

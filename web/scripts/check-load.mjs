@@ -29,17 +29,16 @@ try {
     return done;
   }, CHUNKS);
   await ana.evaluate(() => window.__edit.saved());
+  if (await ana.evaluate(() => window.__edit.dirty())) throw new Error('500 chunks were not saved in time');
   if (await ana.evaluate(() => window.__edit.saving && document.getElementById('status').className === 'fail'))
     throw new Error('saving the chunks failed');
   console.log(`${edited.length} chunks edited and saved`);
 
   // What Felix costs: join as ben, read the info and ask for the chunks, as the page does, until all 500 have arrived.
   // Measured here and not in the page, whose software-rendered scene setup holds up the event loop for seconds.
+  const token = await idToken('ben');
   const started = performance.now();
-  const client = await GatewayClient.connect(GATEWAY, { token: await idToken('ben'), world }, [
-    'cache_versions',
-    'rate_limited',
-  ]);
+  const client = await GatewayClient.connect(GATEWAY, { token, world }, ['cache_versions', 'rate_limited']);
   const arrived = new Promise((resolve) => {
     client.onCacheEntries = (cache, entries) => cache === 'chunks' && resolve(entries.length);
   });
@@ -58,6 +57,8 @@ try {
   );
   const timing = await ben.evaluate(() => window.__timing);
   const taking = timing.ingested - timing.entries;
+  if (!Number.isFinite(taking))
+    throw new Error(`the page never reported taking the chunks in: ${JSON.stringify(timing)}`);
   console.log(
     `${count} saved chunks: ${Math.round(fetching)} ms to join and receive them, ${Math.round(taking)} ms for the page to ` +
       `take them in; its first frame came at ${Math.round(timing.firstFrame)} ms (software rendering, not judged)`,
