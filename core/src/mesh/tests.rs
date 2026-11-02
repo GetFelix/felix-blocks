@@ -201,23 +201,29 @@ fn a_diagonal_block_shades_one_corner() {
     assert_eq!(top_levels(&mesh, 5.0, 5.0), [2, 3, 3, 3]);
 }
 
+/// The quads facing up on the y = 1 plane, the top of a one-block-high floor.
+fn floor_tops(mesh: &ChunkMesh) -> usize {
+    let m = &mesh.opaque;
+    (0..m.quads())
+        .filter(|&q| {
+            (q * 4..q * 4 + 4).all(|v| m.normals[v * 3 + 1] == 1 && m.positions[v * 3 + 1] == 1.0)
+        })
+        .count()
+}
+
 #[test]
 fn merging_needs_equal_shading() {
-    // A row of ground with a pillar beside it: the shaded end must not merge with the lit rest.
-    let row = mesh_chunk(&world(|x, y, z| {
-        if y == 0 && z == 0 && x < 8 {
-            STONE
-        } else {
-            AIR
-        }
-    }));
-    let lit = row.quads();
-    let pillar = mesh_chunk(&world(|x, y, z| match (x, y, z) {
-        (x, 0, 0) if x < 8 => STONE,
-        (4, 1, 0) => STONE,
-        _ => AIR,
-    }));
-    assert!(pillar.quads() > lit);
+    // A row of ground with a pillar beside it: the shaded cells must not merge with the lit rest.
+    let floor = |pillar: bool| {
+        mesh_chunk(&world(|x, y, z| match (x, y, z) {
+            (x, 0, 0) if x < 8 => STONE,
+            (4, 1, 0) if pillar => STONE,
+            _ => AIR,
+        }))
+    };
+    assert_eq!(floor_tops(&floor(false)), 1);
+    // Left of the pillar, the cell beside it, the pillar's own cell, the cell on the other side, the rest.
+    assert_eq!(floor_tops(&floor(true)), 4);
 }
 
 #[test]
@@ -291,7 +297,92 @@ fn winding_matches_the_normal_and_indices_are_in_range() {
     }
 }
 
-/// Every face a cell could show, counted one cell at a time.
+/// The occlusion levels of the up-facing vertices at x, y, z.
+fn up_ao_at(mesh: &ChunkMesh, at: [f32; 3]) -> Vec<u8> {
+    let m = &mesh.opaque;
+    (0..m.quads() * 4)
+        .filter(|&v| m.normals[v * 3 + 1] == 1 && m.positions[v * 3..v * 3 + 3] == at)
+        .map(|v| m.ao[v])
+        .collect()
+}
+
+#[test]
+fn a_diagonal_neighbour_chunk_shades_the_matching_corner() {
+    let mut p = at(&[(15, 0, 15, STONE)]);
+    let mut across = vec![AIR; CELLS];
+    across[cell(0, 1, 0)] = STONE;
+    p.set_chunk([1, 0, 1], &across);
+    let mesh = mesh_chunk(&p);
+    assert_eq!(up_ao_at(&mesh, [16.0, 1.0, 16.0]), [2]);
+    for corner in [[15.0, 1.0, 15.0], [16.0, 1.0, 15.0], [15.0, 1.0, 16.0]] {
+        assert_eq!(up_ao_at(&mesh, corner), [3], "{corner:?}");
+    }
+}
+
+#[test]
+fn a_face_neighbour_chunk_shades_the_corners_beside_it() {
+    let mut p = at(&[(15, 0, 5, STONE)]);
+    let mut east = vec![AIR; CELLS];
+    east[cell(0, 1, 5)] = STONE;
+    p.set_chunk([1, 0, 0], &east);
+    let mesh = mesh_chunk(&p);
+    for z in [5.0, 6.0] {
+        assert_eq!(up_ao_at(&mesh, [16.0, 1.0, z]), [2]);
+        assert_eq!(up_ao_at(&mesh, [15.0, 1.0, z]), [3]);
+    }
+}
+
+#[test]
+fn a_lone_dark_corner_is_on_the_split_diagonal() {
+    let mesh = mesh_chunk(&at(&[(5, 0, 5, STONE), (6, 1, 6, STONE)]));
+    let m = &mesh.opaque;
+    let q = (0..m.quads())
+        .find(|&q| {
+            (q * 4..q * 4 + 4).all(|v| m.normals[v * 3 + 1] == 1 && m.positions[v * 3 + 1] == 1.0)
+                && m.positions[q * 12] < 6.0
+                && m.positions[q * 12 + 2] < 6.0
+        })
+        .unwrap();
+    let dark = (q * 4..q * 4 + 4).find(|&v| m.ao[v] == 2).unwrap() as u32;
+    let tri = |i: usize| &m.indices[q * 6 + i * 3..q * 6 + i * 3 + 3];
+    assert!(tri(0).contains(&dark) && tri(1).contains(&dark));
+}
+
+#[test]
+fn water_sides_follow_the_lowered_surface() {
+    let top = |mesh: &ChunkMesh| {
+        mesh.water
+            .positions
+            .chunks(3)
+            .map(|p| p[1])
+            .fold(0.0, f32::max)
+    };
+    let pond = mesh_chunk(&at(&[(4, 1, 4, WATER), (4, 0, 4, STONE)]));
+    assert_eq!(top(&pond), 2.0 - WATER_DIP);
+    // Under more water the side runs to the block top and only the upper block is lowered.
+    let deep = mesh_chunk(&at(&[(4, 1, 4, WATER), (4, 2, 4, WATER), (4, 0, 4, STONE)]));
+    assert_eq!(top(&deep), 3.0 - WATER_DIP);
+    assert!(deep.water.positions.chunks(3).any(|p| p[1] == 2.0));
+}
+
+#[test]
+fn faces_between_different_kinds_follow_the_rules() {
+    let pair = |a: u8, b: u8| mesh_chunk(&at(&[(4, 1, 4, a), (5, 1, 4, b)]));
+    // Glass hides glass, but leaves keep their faces against leaves.
+    assert_eq!(pair(GLASS, GLASS).glass.quads(), 6);
+    assert_eq!(pair(LEAVES, LEAVES).cutout.quads(), 8);
+    // Water only shows against air, so glass, leaves and stone each cost it a face.
+    assert_eq!(pair(WATER, GLASS).water.quads(), 5);
+    assert_eq!(pair(WATER, LEAVES).water.quads(), 5);
+    assert_eq!(pair(WATER, STONE).water.quads(), 5);
+    // The other side of the pair is still drawn against water.
+    assert_eq!(pair(WATER, GLASS).glass.quads(), 6);
+    assert_eq!(pair(WATER, LEAVES).cutout.quads(), 6);
+    assert_eq!(pair(WATER, STONE).opaque.quads(), 6);
+}
+
+/// Every face a solid, non-water cell could show, counted one cell at a time. Water is left out because its
+/// lowered surface makes its faces shorter than a block.
 fn visible_faces(p: &Padded) -> usize {
     let kinds = Kinds::new();
     let mut n = 0;
@@ -299,7 +390,7 @@ fn visible_faces(p: &Padded) -> usize {
         for z in 0..16 {
             for x in 0..16 {
                 let b = p.at(x, y, z);
-                if kinds.is_air(b) {
+                if kinds.is_air(b) || b == WATER {
                     continue;
                 }
                 for (dx, dy, dz) in [
@@ -338,11 +429,10 @@ fn merged_quads_cover_exactly_the_visible_faces() {
     for seed in [1, 2, 3, 99] {
         let p = busy_chunk(seed);
         let mesh = mesh_chunk(&p);
-        let covered =
-            area(&mesh.opaque) + area(&mesh.cutout) + area(&mesh.glass) + area(&mesh.water);
+        let covered = area(&mesh.opaque) + area(&mesh.cutout) + area(&mesh.glass);
         assert_eq!(covered.round() as usize, visible_faces(&p), "seed {seed}");
         assert!(
-            mesh.quads() < visible_faces(&p),
+            mesh.quads() - mesh.water.quads() < visible_faces(&p),
             "nothing merged for seed {seed}"
         );
     }

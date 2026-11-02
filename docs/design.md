@@ -254,9 +254,11 @@ block whatever it sends. Presence and chat are open to both.
 - **Three.js**, plain TypeScript, no UI framework, built with Vite.
 - **Greedy meshing per chunk** in `core`, run in a Web Worker so meshing never blocks a frame. Faces between two solid blocks are culled; coplanar faces of the same block merge into quads. Per-vertex ambient occlusion gives the blocky look its depth.
 
-  The mesher takes a chunk plus one cell of each of its 26 neighbours, so it can hide faces and shade corners across a chunk edge without knowing about other chunks. A neighbour that is not loaded shows as "unloaded": a face looking into it is not drawn, and it does not shade. It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the shader repeats the tile across it.
+  The mesher takes a chunk plus a one-block border of its 26 neighbours (a 16 by 16 layer from each face neighbour, a row from each edge neighbour, a single block from each corner neighbour). With that it hides faces and shades corners across a chunk edge without knowing about other chunks. A border block that is not loaded shows as "unloaded": a face looking into it is not drawn, and it does not shade. The caller fills the border with a chosen block where there is no chunk, such as past the edge of the world, or those outer walls and the world floor are never drawn.
+
+  It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the page has to repeat the tile across it.
 - **One texture atlas** built at load time from the block textures, with nearest-neighbour filtering and mipmaps padded so edges do not bleed.
-- **Transparent blocks** (water, glass, leaves) in a second mesh per chunk, drawn after the opaque pass.
+- **Draw order**: opaque and cutout blocks (leaves) first, then glass, then water, each as its own mesh per chunk.
 - **The look**: bright daylight, soft fog to the view distance, a sky gradient, and the Felix brand in the UI: cyan `hsl(192, 90%, 46%)` for the cursor outline, selection and accents, Inter for text and JetBrains Mono for coordinates and numbers.
 - **Players** as blocky characters with their name above them.
 - **View distance tiers**, 4 to 12 chunks, picked from the frame time. The target is 60 fps at 8 chunks on a laptop iGPU.

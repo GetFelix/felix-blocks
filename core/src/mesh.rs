@@ -116,7 +116,8 @@ const FACES: [Face; 6] = [
     },
 ];
 
-/// What a block does to the faces and shading around it, by id. Unknown ids and [`UNLOADED`] act as air.
+/// What a block does to the faces and shading around it, by id. Unknown ids count as air; [`UNLOADED`] casts no
+/// occlusion and shows no faces.
 struct Kinds {
     pass: [Option<Pass>; 256],
     /// Tile for the top, side and bottom faces.
@@ -175,13 +176,17 @@ impl Kinds {
 
 static KINDS: OnceLock<Kinds> = OnceLock::new();
 
-/// What must be equal for two faces to merge: the block, its tile and the four corner levels.
+/// What must be equal for two faces to merge: the block, its tile, the four corner levels and, for water, whether the
+/// top edge is lowered.
 type Key = u32;
 
-fn key(block: u8, tile: u8, ao: [u8; 4]) -> Key {
+fn key(block: u8, tile: u8, ao: [u8; 4], dipped: bool) -> Key {
     let packed = ao.iter().fold(0u32, |k, l| k << 2 | u32::from(*l));
-    u32::from(block) << 16 | u32::from(tile) << 8 | packed
+    u32::from(dipped) << 24 | u32::from(block) << 16 | u32::from(tile) << 8 | packed
 }
+
+/// Set on a water side face whose top edge meets the lowered water surface.
+const DIPPED: Key = 1 << 24;
 
 /// Meshes the chunk inside `padded`.
 pub fn mesh_chunk(padded: &Padded) -> ChunkMesh {
@@ -203,8 +208,17 @@ pub fn mesh_chunk(padded: &Padded) -> ChunkMesh {
                         continue;
                     }
                     let tile = kinds.tiles[usize::from(b)][slot(face)];
-                    mask[iv as usize * SIZE + iu as usize] =
-                        key(b, tile, corner_levels(kinds, padded, face, out_of, b));
+                    // The surface is lowered where water has no water above it, so a side face must follow it.
+                    let dipped = face.axis != 1
+                        && kinds.pass[usize::from(b)] == Some(Pass::Water)
+                        && kinds.pass[usize::from(padded.at(at[0], at[1] + 1, at[2]))]
+                            != Some(Pass::Water);
+                    mask[iv as usize * SIZE + iu as usize] = key(
+                        b,
+                        tile,
+                        corner_levels(kinds, padded, face, out_of, b),
+                        dipped,
+                    );
                 }
             }
             merge(kinds, face, slice, &mut mask, &mut out);
@@ -285,7 +299,7 @@ fn merge(
             for dv in 0..h {
                 mask[(iv + dv) * SIZE + iu..(iv + dv) * SIZE + iu + w].fill(0);
             }
-            let pass = kinds.pass[(k >> 16) as usize].unwrap();
+            let pass = kinds.pass[(k >> 16 & 0xff) as usize].unwrap();
             quad(
                 out.pass_mut(pass),
                 face,
@@ -321,6 +335,7 @@ fn quad(
     let mut normal = [0i8; 3];
     normal[face.axis] = if face.positive { 1 } else { -1 };
     let water_top = water && face.axis == 1 && face.positive;
+    let dipped_side = k & DIPPED != 0;
     for (i, (a, c)) in [(0, 0), (1, 0), (1, 1), (0, 1)].into_iter().enumerate() {
         let mut p = [0f32; 3];
         p[face.axis] = plane as f32;
@@ -331,7 +346,7 @@ fn quad(
         d[face.axis] = if face.positive { 1.0 } else { 0.0 };
         d[face.u] = (a * size[0]) as f32;
         d[face.v] = (c * size[1]) as f32;
-        if water_top {
+        if water_top || (dipped_side && d[1] > 0.0) {
             p[1] -= WATER_DIP;
         }
         mesh.positions.extend(p);
@@ -341,8 +356,8 @@ fn quad(
         mesh.tiles.push(tile);
         mesh.ao.push(ao[i]);
     }
-    // Split along the diagonal that keeps the brighter corners together.
-    let flip = ao[0] + ao[2] < ao[1] + ao[3];
+    // Split along the darker diagonal so a lone dark corner shades symmetrically.
+    let flip = ao[0] + ao[2] > ao[1] + ao[3];
     let order: [u32; 6] = if flip {
         [1, 2, 3, 1, 3, 0]
     } else {
