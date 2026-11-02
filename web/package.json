@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "assets": "node scripts/check-assets.mjs",
     "atlas": "node scripts/check-atlas.mjs",
-    "chunks": "node scripts/check-chunks.mjs"
+    "chunks": "node scripts/check-chunks.mjs",
+    "play": "node scripts/check-play.mjs"
   },
   "dependencies": {
     "three": "0.170.0"

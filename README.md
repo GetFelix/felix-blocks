@@ -12,10 +12,11 @@ browsers write the world, and Felix stores it, orders the writes and tells
 everyone what changed.
 
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
-> the look, day and night; nothing is playable yet. The project's code is
-> started: the block table, the asset pipeline, meshing, terrain generated
-> from a seed, the keys and values chunks are stored under, and `blocks-tool`,
-> which creates a world in Felix. The plan is in
+> the look, day and night. The project's code is started: the block table,
+> the asset pipeline, meshing, terrain generated from a seed, the keys and
+> values chunks are stored under, `blocks-tool`, which creates a world in
+> Felix, and walking around that terrain in first person. Nothing is saved
+> yet. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
@@ -25,7 +26,15 @@ everyone what changed.
 
 ## Run it
 
-There is nothing to play yet. What runs today is the asset page, which loads
+You can walk around a generated world, and nothing more yet. The play page
+(`/play.html`) drops you into a world made from a seed (`?seed=7` by default).
+Click it to look around with the mouse, walk with WASD or the arrows, jump with
+space, sprint with shift, and fly with F or a double tap of space (space rises,
+shift sinks, and landing ends the flight). You walk on the generated terrain,
+swim in water, and cannot pass through blocks. Nothing is saved, and digging
+and placing are not in yet.
+
+The rest of what runs is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
 the atlas page, which packs the textures into one atlas and shows each at a
 distance, and the chunks page, which draws a generated world meshed in Web Workers
@@ -41,7 +50,7 @@ installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
 cd web
 npm ci
 npm run core    # build core/ to WebAssembly into src/core
-npm run dev     # the asset page at http://localhost:5173, then /atlas.html and /chunks.html
+npm run dev     # the asset page at http://localhost:5173, then /play.html, /atlas.html and /chunks.html
 ```
 
 The checks CI runs are `npm run format:check`, `npm run typecheck`, `npm test`
@@ -53,7 +62,11 @@ distance. `npm run chunks -- <url of chunks.html>` meshes and draws the generate
 world, and fails if the page does any of the meshing itself, if a merged quad
 does not look like the separate blocks it replaces, or if the view distance does
 not step down under 40 ms frames. It does not show the controller following the
-frame time in both directions; the unit tests cover that.
+frame time in both directions; the unit tests cover that. `npm run play -- <url
+of play.html>` presses the keys: the player must land, walk, fly up and come
+back down. The physics itself (walls, steps, ceilings, water, chunks that have
+not arrived, and a long walk over real terrain that never ends inside a block)
+is in `web/src/player.test.ts`.
 
 ### The Felix stack
 
