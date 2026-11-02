@@ -112,16 +112,16 @@ second. [docs/design.md](docs/design.md) has the details.
 
 ## Status
 
-| M | Milestone | What it proves | State |
-|---|---|---|---|
-| 0 | The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame and asset pipeline done |
-| 1 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
-| 2 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
-| 3 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
-| 4 | Worlds with owners | Builders and visitors, enforced by Felix | Planned |
-| 5 | Region watches | Joining costs what you can see, not the whole world | Planned |
-| 6 | Scale and failover | 50 players, broker restarts and failover | Planned |
-| 7 | Self-hosting | Anyone can run it | Planned |
+| Milestone | What it proves | State |
+|---|---|---|
+| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame and asset pipeline done |
+| A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
+| Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
+| A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
+| Worlds with owners | Builders and visitors, enforced by Felix | Planned |
+| Region watches | Joining costs what you can see, not the whole world | Planned |
+| Scale and failover | 50 players, broker restarts and failover | Planned |
+| Self-hosting | Anyone can run it | Planned |
 
 ## Repository layout
 
