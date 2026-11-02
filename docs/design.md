@@ -90,6 +90,41 @@ a second byte per block. A 16³ chunk tops out at 4 KiB. The
 cost of the smaller chunk is more keys and more meshes, which greedy meshing
 and a bounded view distance keep cheap.
 
+### World generation
+
+`core` builds the terrain of a chunk from the world's seed, a 32 bit number,
+and a generator version. The same three inputs give the same 4,096 bytes in the
+browser and in `blocks-tool`, because the generator uses integers only: a hash
+of the seed and position feeds value noise that is blended with fixed-point
+arithmetic. `cargo test` and the web tests both check a list of chunks from
+seven seeds against one file of hashes, `core/testdata/worldgen.golden`, so
+the native and WebAssembly builds are known to agree.
+
+Version 1 makes:
+
+- **Ground.** Three noises of different widths set a column's height. It is at
+  least 40 and 115 is the possible maximum, but typical ground sits around 77
+  and the highest in a world is near 111. Where the ground is below 70, the
+  column fills with water up to and including y = 70, the water surface. Grass
+  covers dry ground over three layers of dirt, with stone below. Sand lines the
+  water's edge and covers the seabed, with patches of gravel.
+- **Caves.** Tunnels where two independent 3D noises are both near their
+  middle. They stay five blocks below the surface, except in a few zones where
+  they open to it. The bottom three layers are never hollow.
+- **Ore.** Single coal and iron blocks scattered through the stone. Iron
+  appears only below y = 60.
+- **Trees.** A tree grows on dry ground, with a trunk of four to six logs and a
+  rounded crown. They are rare in open country and common in woods. A tree
+  on the edge of a chunk is drawn by both chunks, so it is whole on each side.
+
+Layer 8 and above are always air, since the highest ground plus a tree stays
+under 128 blocks.
+
+A saved world depends on the exact blocks of its generator, so a change to
+what version 1 makes is not allowed. The golden file fails the tests if it
+happens. A better generator is a new version, and a world keeps the version
+written in its info and chunk values.
+
 ### Only edits are stored
 
 A chunk that nobody has changed has no key. Its blocks come from the seed. A

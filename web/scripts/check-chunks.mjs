@@ -33,7 +33,15 @@ async function open(page, resultName, shot) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(sibling(page.__path), { waitUntil: 'load', timeout: 120_000 });
-  await page.waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 240_000 });
+  // Software rendering on a shared runner is several times slower than a laptop, so the walk is given time.
+  // A page that broke says why instead of timing out blind.
+  await page
+    .waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 900_000 })
+    .catch((e) => {
+      throw new Error(
+        `${sibling(page.__path)} was not ready: ${e.message}\npage errors: ${errors.join(' | ') || 'none'}`,
+      );
+    });
   const result = await page.evaluate((name) => window[name], resultName);
   // Kept even when the check fails, which is when the picture is most wanted.
   if (out && shot) await page.screenshot({ path: `${out}/${shot}.png` }).catch(() => {});

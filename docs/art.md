@@ -66,7 +66,7 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
 
 ## Meshed chunks
 
-`/chunks.html` draws a made-up world (hills, a lake, trees and a house) the way
+`/chunks.html` draws terrain generated from a seed (hills, lakes, sand, woods and caves) the way
 the game will: chunks meshed in workers, the atlas on every quad, the sun and
 hemisphere light of the style frame, soft shadows and fog. The camera walks across
 chunk boundaries while new chunks stream in, then stops and the page keeps drawing.

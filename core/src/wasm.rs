@@ -8,6 +8,51 @@ pub fn block_table() -> String {
     crate::blocks::table_json()
 }
 
+/// [`crate::worldgen::GENERATOR_VERSION`]: the generator new worlds use.
+#[wasm_bindgen(js_name = generatorVersion)]
+pub fn generator_version() -> u8 {
+    crate::worldgen::GENERATOR_VERSION
+}
+
+/// [`crate::worldgen::SEA_LEVEL`].
+#[wasm_bindgen(js_name = seaLevel)]
+pub fn sea_level() -> i32 {
+    crate::worldgen::SEA_LEVEL
+}
+
+/// [`crate::worldgen::WORLD_CHUNKS`]: x, y (up) and z.
+#[wasm_bindgen(js_name = worldChunks)]
+pub fn world_chunks() -> Vec<i32> {
+    crate::worldgen::WORLD_CHUNKS.to_vec()
+}
+
+/// [`crate::worldgen::TERRAIN_LAYERS`].
+#[wasm_bindgen(js_name = terrainLayers)]
+pub fn terrain_layers() -> i32 {
+    crate::worldgen::TERRAIN_LAYERS
+}
+
+/// [`crate::worldgen::generate_chunk`]: 4,096 block ids. Throws for a generator version that does not exist and for a
+/// chunk outside the world.
+#[wasm_bindgen(js_name = generateChunk)]
+pub fn generate_chunk(
+    version: u8,
+    seed: u32,
+    cx: i32,
+    cy: i32,
+    cz: i32,
+) -> Result<Vec<u8>, JsError> {
+    crate::worldgen::generate_chunk(version, seed, cx, cy, cz)
+        .ok_or_else(|| JsError::new("no such generator version or chunk outside the world"))
+}
+
+/// [`crate::worldgen::ground_height`]. Throws for a generator version that does not exist.
+#[wasm_bindgen(js_name = groundHeight)]
+pub fn ground_height(version: u8, seed: u32, x: i32, z: i32) -> Result<i32, JsError> {
+    crate::worldgen::ground_height(version, seed, x, z)
+        .ok_or_else(|| JsError::new("no such generator version"))
+}
+
 fn pass(index: u8) -> Result<crate::Pass, JsError> {
     match index {
         0 => Ok(crate::Pass::Opaque),

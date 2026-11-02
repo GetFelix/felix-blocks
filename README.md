@@ -13,7 +13,8 @@ everyone what changed.
 
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
 > the look, day and night; nothing is playable yet. The project's code is
-> started: the block table and the asset pipeline. The plan is in
+> started: the block table, the asset pipeline, meshing, and terrain generated
+> from a seed. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
@@ -26,7 +27,7 @@ everyone what changed.
 There is nothing to play yet. What runs today is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
 the atlas page, which packs the textures into one atlas and shows each at a
-distance, and the chunks page, which draws a made-up world meshed in Web Workers
+distance, and the chunks page, which draws a generated world meshed in Web Workers
 while the camera walks through it (add `?adapt=1` to let the frame time pick the
 view distance, `?tier=8` to hold it at 8 chunks, and `?debug=1` for the panel with
 the frame rate; see [docs/art.md](docs/art.md#view-distance-and-the-debug-panel)).
@@ -47,7 +48,7 @@ and `npm run build` in `web/`, `cargo fmt --check`, `cargo clippy` and
 `cargo test` at the root, and the Felix stack below. `npm run assets -- <url>` opens a served page in
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
-distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
+distance. `npm run chunks -- <url of chunks.html>` meshes and draws the generated
 world, and fails if the page does any of the meshing itself, if a merged quad
 does not look like the separate blocks it replaces, or if the view distance does
 not step down under 40 ms frames. It does not show the controller following the
