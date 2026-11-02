@@ -11,17 +11,22 @@
 - The gateway is a relay. Anything that needs to understand a chunk belongs in `core/`.
 - Plain TypeScript and Three.js in `web/`, no UI framework.
 - Format with `cargo fmt` and prettier. Pin dependency versions.
+- The block table's ids are the stored format. Add blocks at the end, never renumber or reuse an id.
 
 ## Art
 
 - Every colour comes from the palette module.
-- Assets must be CC0 or similarly free and listed with their source and licence in the credits file.
+- Assets must be CC0 or similarly free and listed with their source and licence in `web/assets/CREDITS.md`. A tile or model is only added when a block or feature uses it; tests fail on an asset nothing uses and on a pack with no credits row.
 - A change to lighting, materials, textures or meshing comes with before and after screenshots of the same view and a frame time on an iGPU.
 
 ## Comments and docs
 
 - Only comment where the code is unclear, such as a constraint the code can't show.
 - Write docs in plain sentences, and update them in the same pull request as the behaviour they describe.
+
+## Checks
+
+[README.md](README.md#run-it) has the commands. CI runs them all, and `CI ok` is the one check main requires.
 
 ## Pull requests
 

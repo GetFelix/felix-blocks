@@ -191,13 +191,13 @@ watch that falls behind is ended with a resume point, and the client resumes
 from there, so a slow device never draws a stale world without knowing it.
 
 Today's gateway can only watch a whole cache from the start, with no prefix
-and no resume (gaps 2 to 4 below), so until M5 a client watches the whole
+and no resume (gaps 2 to 4 below), so until region watches land a client watches the whole
 world and re-downloads it on reconnect. The client hides this behind one watch
 interface so region watches drop in later.
 
 Watches read one shard, so a world's chunk cache has one shard. A world is a
 few thousand edited chunks at most, about 4 MB, and one shard holds that
-comfortably. Spreading a big world across shards is an M6 question.
+comfortably. Spreading a big world across shards is a question for the scale work.
 
 ### Presence
 
@@ -271,23 +271,24 @@ Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 | [Survival Kit](https://kenney.nl/assets/survival-kit) (80 assets) | Props: tools, tents, crates | Held items, decoration |
 
 The style frame uses the Voxel Pack and Blocky Characters from
-`prototype/assets/`; [docs/art.md](art.md) has the palette and the restyling.
-Moving them into the client and building the atlas there is M0 work.
+`web/assets/`, which the client loads the same way. [docs/art.md](art.md) has
+the palette and the restyling. Building the atlas in the client is the next
+step of the look.
 
 ## Build order
 
-| M | Milestone | Proves |
-|---|---|---|
-| 0 | The look, locked: asset pipeline, block atlas, greedy meshing, style frame, view distance tiers | It looks good at 60 fps before Felix is involved |
-| 1 | A world you can edit, solo, through Felix: `core`, the dev stack, `blocks-tool`, chunk values, offline mode | Demonstrations 2, 3 and 5 for one player |
-| 2 | Multiplayer: conditional chunk writes, presence, the online list, chat | Demonstration 1, the headline |
-| 3 | A world that lasts: compaction proof, rejoin by offset, world export and import | Demonstration 4 |
-| 4 | Worlds with owners: builders and visitors, opening a solo world to friends | Demonstrations 5 and 6 |
-| 5 | Region watches: watch only the regions around the player | Join cost bounded by view, not world size |
-| 6 | Scale: 50 players in a world, bots, broker restart and failover | It holds under load and loss |
-| 7 | Self-hosting: images, compose, Helm, releases | Anyone can run it |
+| Milestone | Proves |
+|---|---|
+| The look, locked: asset pipeline, block atlas, greedy meshing, style frame, view distance tiers | It looks good at 60 fps before Felix is involved |
+| A world you can edit, solo, through Felix: `core`, the dev stack, `blocks-tool`, chunk values, offline mode | Demonstrations 2, 3 and 5 for one player |
+| Multiplayer: conditional chunk writes, presence, the online list, chat | Demonstration 1, the headline |
+| A world that lasts: compaction proof, rejoin by offset, world export and import | Demonstration 4 |
+| Worlds with owners: builders and visitors, opening a solo world to friends | Demonstrations 5 and 6 |
+| Region watches: watch only the regions around the player | Join cost bounded by view, not world size |
+| Scale: 50 players in a world, bots, broker restart and failover | It holds under load and loss |
+| Self-hosting: images, compose, Helm, releases | Anyone can run it |
 
-**M0 comes first on purpose**, for the reason felix-arena and felix-metro give:
+**The look comes first on purpose**, for the reason felix-arena and felix-metro give:
 looking good is the requirement most likely to fail late, so the look is fixed
 before anything is built inside it.
 
@@ -302,7 +303,7 @@ before anything is built inside it.
 
 Checked against Felix's cache docs and felix-gateway's protocol and source.
 
-1. **No conditional writes through the gateway.** Felix has `cache_put_if` and `cache_get_versioned`, but the gateway relays only `cache_put`, `cache_get`, `cache_delete` and `cache_watch`, and none of its messages carry a version. Without it, two players writing one chunk is last write wins. M1 is single player and can live with that; M2 needs it. The fallback is an edit stream whose log order decides, folded by every client.
+1. **No conditional writes through the gateway.** Felix has `cache_put_if` and `cache_get_versioned`, but the gateway relays only `cache_put`, `cache_get`, `cache_delete` and `cache_watch`, and none of its messages carry a version. Without it, two players writing one chunk is last write wins. The solo world can live with that; multiplayer needs it. The fallback is an edit stream whose log order decides, folded by every client.
 2. **The gateway's cache watch is the whole cache.** It always watches every key, so there is no key or prefix watch from a browser. Joining a world downloads every edited chunk in it. Fine for small worlds, and the reason region watches are their own milestone.
 3. **The gateway's cache watch cannot resume.** `cache_change` carries no offset and `cache_watch` takes no `from_offset`, so a client that reconnects downloads the whole world again instead of what it missed.
 4. **The gateway's cache watch needs a single-shard cache.** It opens a prefix watch without naming a shard, which Felix refuses on a multi-shard cache. World caches stay at one shard until it watches every shard.
@@ -314,4 +315,4 @@ Checked against Felix's cache docs and felix-gateway's protocol and source.
 
 - [ ] Can one gateway scope give the same cache `read` and `watch` to everyone and `write` only to builders, for example as two aliases with `write` optional? If not, builders and visitors need a gateway change.
 - [ ] Should a solo world be created on first play with a default seed, or always through a "new world" screen?
-- [ ] How many blocks in the palette at M1: a small fixed set, or the whole Voxel Pack?
+- [ ] How many blocks in the palette for the solo world: a small fixed set, or the whole Voxel Pack?
