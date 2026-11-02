@@ -29,6 +29,9 @@ interface Job {
 const createWorker = (): WorkerLike =>
   new Worker(new URL('./mesher.worker.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike;
 
+/** Workers that may fail in a row, with no job finishing in between, before the pool stops replacing them. */
+const MAX_CONSECUTIVE_CRASHES = 3;
+
 export class Mesher {
   private readonly create: () => WorkerLike;
   private readonly idle: WorkerLike[] = [];
@@ -38,6 +41,9 @@ export class Mesher {
   private readonly latest = new Map<string, Job>();
   private nextId = 1;
   private done = false;
+  private crashes = 0;
+  /** Set once every worker has failed and none could be replaced; every request after that rejects with it. */
+  private broken: Error | null = null;
 
   constructor(options: { workers?: number; create?: () => WorkerLike } = {}) {
     this.create = options.create ?? createWorker;
@@ -62,6 +68,7 @@ export class Mesher {
    */
   request(key: string, chunks: ChunkNeighbourhood, priority = 0): Promise<MeshResult | null> {
     if (this.done) return Promise.reject(new Error('the mesher is shut down'));
+    if (this.broken) return Promise.reject(this.broken);
     return new Promise((resolve, reject) => {
       const job: Job = { id: this.nextId++, key, chunks, priority, resolve, reject };
       const queuedBefore = this.queue.findIndex((j) => j.key === key);
@@ -70,6 +77,13 @@ export class Mesher {
       this.queue.push(job);
       this.pump();
     });
+  }
+
+  /** Changes the priority of a request that is still queued. Returns false if it is not (running, done or unknown). */
+  prioritize(key: string, priority: number): boolean {
+    const job = this.queue.find((j) => j.key === key);
+    if (job) job.priority = priority;
+    return job !== undefined;
   }
 
   /** Drops a queued request, and the result of a running one. */
@@ -119,6 +133,7 @@ export class Mesher {
   private finish(worker: WorkerLike, reply: MeshResponse): void {
     const job = this.release(worker);
     if (this.done) return;
+    this.crashes = 0;
     this.idle.push(worker);
     if (job) {
       const current = this.latest.get(job.key) === job;
@@ -133,11 +148,23 @@ export class Mesher {
     const job = this.release(worker);
     worker.terminate();
     if (this.done) return;
-    this.idle.push(this.spawn());
+    // A worker can also die while idle, and must not be handed the next job.
+    const at = this.idle.indexOf(worker);
+    if (at >= 0) this.idle.splice(at, 1);
     if (job) {
       if (this.latest.get(job.key) === job) this.latest.delete(job.key);
       job.reject(error);
     }
+    // A worker that cannot load (a bad build, a blocked script) would otherwise be replaced forever.
+    if (++this.crashes <= MAX_CONSECUTIVE_CRASHES) this.idle.push(this.spawn());
+    else if (this.idle.length + this.running.size === 0) this.giveUp(error);
     this.pump();
+  }
+
+  private giveUp(cause: Error): void {
+    this.broken = new Error(`the meshing workers keep failing: ${cause.message}`);
+    for (const job of this.queue) job.reject(this.broken);
+    this.queue = [];
+    this.latest.clear();
   }
 }

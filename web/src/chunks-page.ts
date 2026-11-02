@@ -8,7 +8,7 @@ import { ChunkView } from './chunk-view';
 import { loadBlockTable } from './core';
 import { createFixtureWorld } from './fixture-world';
 import { Mesher } from './mesher';
-import { loadMesher, meshChunk } from './meshing';
+import { loadMesher, meshChunk, meshedHere } from './meshing';
 import { createLook } from './scene';
 import { terrainMaterials, warmUp } from './terrain';
 
@@ -20,8 +20,11 @@ interface Result {
   applyMs: { p50: number; p95: number; max: number };
   /** Time spent meshing per chunk, in the worker or on the page. */
   meshMs: { p50: number; p95: number; max: number };
-  /** Milliseconds the page was blocked by meshing itself: zero when a worker does it. */
-  blockedMs: number;
+  /** What the page meshed on its own thread: nothing at all when the workers do it. */
+  onPage: { calls: number; ms: number };
+  /** Chunks in range of the last position that have a result to draw, and how many of them are drawn. */
+  wanted: number;
+  drawn: number;
   failures: string[];
 }
 
@@ -39,7 +42,9 @@ const result: Result = {
   frames: 0,
   applyMs: { p50: 0, p95: 0, max: 0 },
   meshMs: { p50: 0, p95: 0, max: 0 },
-  blockedMs: 0,
+  onPage: { calls: 0, ms: 0 },
+  wanted: 0,
+  drawn: 0,
   failures: [],
 };
 
@@ -50,25 +55,22 @@ const summary = (xs: number[]) => {
 };
 
 /** Meshes on the page, one job per timer tick, so the cost lands on the main thread. */
-function inlineMesher(): Pick<Mesher, 'request' | 'cancel' | 'queued' | 'busy'> & { blocked: number } {
-  const self = {
-    blocked: 0,
+function inlineMesher(): Pick<Mesher, 'request' | 'cancel' | 'prioritize' | 'queued' | 'busy'> {
+  return {
     queued: 0,
     busy: 0,
     cancel() {},
+    prioritize: () => false,
     request(_key: string, chunks: Parameters<typeof meshChunk>[0]) {
       return new Promise<{ data: ReturnType<typeof meshChunk>; ms: number } | null>((resolve) =>
         setTimeout(() => {
           const start = performance.now();
           const data = meshChunk(chunks);
-          const ms = performance.now() - start;
-          self.blocked += ms;
-          resolve({ data, ms });
+          resolve({ data, ms: performance.now() - start });
         }, 0),
       );
     },
   };
-  return self;
 }
 
 async function run() {
@@ -81,9 +83,14 @@ async function run() {
   const look = createLook(canvas);
   const { renderer, scene } = look;
   renderer.setPixelRatio(1);
-  const size = () => renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 900);
+  const size = () => {
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+    camera.aspect = canvas.clientWidth / canvas.clientHeight;
+    camera.updateProjectionMatrix();
+  };
   size();
-  const camera = new THREE.PerspectiveCamera(72, canvas.clientWidth / canvas.clientHeight, 0.05, 900);
+  window.addEventListener('resize', size);
 
   const texture = atlasTexture(atlas, renderer.capabilities.getMaxAnisotropy());
   const materials = terrainMaterials(texture, atlas.layout, table.tiles);
@@ -132,16 +139,35 @@ async function run() {
   }
   while (view.pending > 0) await frame();
   place(80);
+  view.update(camera.position, RADIUS);
+  while (view.pending > 0) await frame();
   renderer.render(scene, camera);
 
   result.chunks = view.stats.meshed;
   result.frames = frames;
   result.applyMs = summary(view.stats.applyMs);
   result.meshMs = summary(view.stats.meshMs);
-  result.blockedMs = 'blocked' in mesher ? mesher.blocked : 0;
+  result.onPage = { calls: meshedHere.calls, ms: meshedHere.ms };
+  // Everything within range of where the walk ended has to be on screen, however the requests raced on the way.
+  const [px, pz] = [Math.floor(camera.position.x / 16), Math.floor(camera.position.z / 16)];
+  for (let cz = pz - RADIUS; cz <= pz + RADIUS; cz++)
+    for (let cx = px - RADIUS; cx <= px + RADIUS; cx++)
+      for (let cy = 0; cy < world.size[1]; cy++) {
+        if ((cx - px) ** 2 + (cz - pz) ** 2 > RADIUS * RADIUS || !world.chunk(cx, cy, cz)) continue;
+        result.wanted++;
+        if (view.has(cx, cy, cz)) result.drawn++;
+      }
+  if (result.drawn !== result.wanted)
+    result.failures.push(`${result.drawn} of ${result.wanted} chunks in range are drawn`);
   if (view.stats.meshed === 0) result.failures.push('no chunk was meshed');
   if (view.loadedChunks === 0) result.failures.push('nothing was drawn');
-  if (mesher instanceof Mesher) mesher.dispose();
+
+  // The scripted walk is over, so the camera stays where it ended; the page keeps drawing for anyone looking at it.
+  const live = () => {
+    renderer.render(scene, camera);
+    requestAnimationFrame(live);
+  };
+  live();
 }
 
 const status = document.getElementById('status')!;

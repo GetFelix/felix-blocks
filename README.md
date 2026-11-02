@@ -45,8 +45,9 @@ and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
 `cargo test` at the root. `npm run assets -- <url>` opens a served page in
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
-distance. `npm run chunks -- <url>` meshes and draws the made-up world, and
-fails if a merged quad does not look like the separate blocks it replaces.
+distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
+world, and fails if the page does any of the meshing itself or if a merged quad
+does not look like the separate blocks it replaces.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open

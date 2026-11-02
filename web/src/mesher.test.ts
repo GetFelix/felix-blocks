@@ -126,3 +126,59 @@ test('dispose ends the workers and settles every request', async () => {
   expect(made[0]!.terminated).toBe(true);
   await expect(mesher.request('c', chunks)).rejects.toThrow('shut down');
 });
+
+test('a worker that dies while idle is replaced and never given a job', () => {
+  const { mesher, made } = pool(2);
+  made[0]!.onerror!({ message: 'gone' });
+  expect(made[0]!.terminated).toBe(true);
+  expect(made).toHaveLength(3);
+  for (const key of ['a', 'b', 'c']) void mesher.request(key, chunks);
+  expect(made[0]!.jobs).toHaveLength(0);
+  expect(mesher.busy).toBe(2);
+  expect(mesher.queued).toBe(1);
+});
+
+test('workers that cannot load are given up on, and every request settles', async () => {
+  const { mesher, made } = pool(1);
+  const jobs = ['a', 'b', 'c', 'd', 'e'].map((k) => mesher.request(k, chunks));
+  // Each worker fails before it answers anything, like a script that does not load.
+  for (let i = 0; i < 4; i++) made[i]!.onerror!({ message: 'no module' });
+  for (const job of jobs.slice(0, 4)) await expect(job).rejects.toThrow('no module');
+  await expect(jobs[4]).rejects.toThrow('keep failing');
+  // The first worker and three replacements, then it stops instead of spawning forever.
+  expect(made).toHaveLength(4);
+  expect(mesher.queued).toBe(0);
+  await expect(mesher.request('f', chunks)).rejects.toThrow('keep failing');
+});
+
+test('a finished job resets the count of failures in a row', async () => {
+  const { mesher, made } = pool(1);
+  for (let round = 0; round < 3; round++) {
+    const w = made.at(-1)!;
+    const ok = mesher.request(`ok${round}`, chunks);
+    w.answer(w.jobs.at(-1)!.id);
+    await ok;
+    const bad = mesher.request(`bad${round}`, chunks);
+    w.onerror!({ message: 'once' });
+    await expect(bad).rejects.toThrow('once');
+  }
+  expect(made).toHaveLength(4);
+  const w = made.at(-1)!;
+  const ok = mesher.request('still works', chunks);
+  w.answer(w.jobs.at(-1)!.id);
+  expect(await ok).not.toBeNull();
+});
+
+test('prioritize moves a queued request ahead and leaves a running one alone', () => {
+  const { mesher, made } = pool(1);
+  mesher.request('running', chunks, 0);
+  mesher.request('far', chunks, 50);
+  mesher.request('near', chunks, 10);
+  expect(mesher.prioritize('far', 1)).toBe(true);
+  expect(mesher.prioritize('running', 1)).toBe(false);
+  expect(mesher.prioritize('missing', 1)).toBe(false);
+  const w = made[0]!;
+  w.answer(w.jobs[0]!.id);
+  // 'far' was request 2 and now has the lowest number, so it starts before 'near' (request 3).
+  expect(w.jobs.map((j) => j.id)).toEqual([1, 2]);
+});

@@ -69,15 +69,24 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
 `/chunks.html` draws a made-up world (hills, a lake, trees and a house) the way
 the game will: chunks meshed in workers, the atlas on every quad, the sun and
 hemisphere light of the style frame, soft shadows and fog. The camera walks across
-chunk boundaries while new chunks stream in.
+chunk boundaries while new chunks stream in, then stops and the page keeps drawing.
 
 ![Meshed chunks](screenshots/chunks-worker-meshed.jpg)
 
-Run `npm run dev` in `web/` and open it, or `npm run chunks -- <url>` to check
-it headless. The check fails if the page spends more than 5 ms turning a
-chunk's mesh into scene objects, or if a merged quad does not match the same
-floor drawn as separate blocks. It also draws that floor with the wrong shader
-and fails if it does not see the seams, so it is known to notice them.
+Run `npm run dev` in `web/` and open it, or `npm run chunks -- <url of chunks.html>`
+to check it headless. The check fails if:
+
+- the page meshes any chunk itself. The page counts the meshing it does on its own
+  thread, which has to be zero while workers do the work. The same walk with
+  `?inline=1` meshes on the page and has to count every chunk, so the count is known to
+  see it.
+- the page spends more than 5 ms (95th percentile) turning a chunk's mesh into scene
+  objects.
+- a chunk in range at the end of the walk is not drawn.
+- a merged quad does not match the same blocks drawn separately. It checks a floor and a
+  wall whose quads are not square, with the anisotropic filtering the game uses. It also
+  draws both with the wrong shader and fails if it does not see seams, so it is known to
+  notice them.
 
 Not done yet: the sky light that darkens caves and eaves, and plants. The
 frame time on a laptop iGPU is measured when the view distance tiers land;

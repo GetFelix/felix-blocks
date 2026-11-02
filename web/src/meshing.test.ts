@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
-import { CENTRE, loadMesher, meshChunk, neighbourIndex, transferList } from './meshing';
+import { CENTRE, loadMesher, meshChunk, meshedHere, neighbourIndex, transferList } from './meshing';
 
 const cell = (x: number, y: number, z: number) => (y << 8) | (z << 4) | x;
 
@@ -58,4 +58,14 @@ test('transferList names every buffer once, so a result moves instead of being c
   const buffers = transferList(meshChunk(around(chunk)));
   expect(buffers).toHaveLength(24);
   expect(new Set(buffers).size).toBe(24);
+});
+
+test('meshing on this thread is counted, so a page can show it did none', () => {
+  const chunk = new Uint8Array(4096);
+  chunk[cell(1, 1, 1)] = 3;
+  const before = meshedHere.calls;
+  meshChunk(around(chunk));
+  meshChunk(around(chunk));
+  expect(meshedHere.calls).toBe(before + 2);
+  expect(meshedHere.ms).toBeGreaterThan(0);
 });

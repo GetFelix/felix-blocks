@@ -27,10 +27,17 @@ export async function loadMesher(wasm?: BufferSource): Promise<void> {
   await init(wasm ? { module_or_path: wasm } : undefined);
 }
 
+/**
+ * Meshing done on the thread that imported this module. The worker has its own copy of the module, so on the page it
+ * counts only what the page meshed itself, which should be nothing when the pool is in use.
+ */
+export const meshedHere = { calls: 0, ms: 0 };
+
 /** Meshes the centre chunk. Neighbours that are missing show as not loaded, so no wall is drawn against them. */
 export function meshChunk(chunks: ChunkNeighbourhood): ChunkMeshData {
   const centre = chunks[CENTRE];
   if (!centre) throw new Error('a meshing job needs the chunk itself');
+  const start = performance.now();
   const n = new Neighbourhood();
   try {
     for (let dy = -1; dy <= 1; dy++)
@@ -55,6 +62,8 @@ export function meshChunk(chunks: ChunkNeighbourhood): ChunkMeshData {
     }
   } finally {
     n.free();
+    meshedHere.calls++;
+    meshedHere.ms += performance.now() - start;
   }
 }
 
