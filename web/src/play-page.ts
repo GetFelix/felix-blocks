@@ -2,7 +2,8 @@
 // or the wheel. ?debug=1 shows the view distance panel.
 // With ?gateway=ws://...&world=NAME&token=ID_TOKEN the page joins that world in Felix: it reads the world's info (seed,
 // generator, spawn point) and the chunks players changed, and saves the edits. Without them it makes a world from
-// ?seed=N (7 by default) that is not saved. (There is no sign-in page yet: on the dev stack
+// ?seed=N (7 by default) that is not saved. ?offline=NAME plays a world kept in this browser instead, with no network:
+// it is made from ?seed=N the first time and keeps its own seed after that. (There is no sign-in page yet: on the dev stack
 // `curl 'http://127.0.0.1:9400/token?sub=ana&aud=felix-blocks'` mints a token.)
 // scripts/check-play.mjs reads window.__play once window.__ready is true.
 import * as THREE from 'three';
@@ -14,8 +15,9 @@ import { loadBlockTable } from './core';
 import { DebugOverlay } from './debug-overlay';
 import { type ChunkPos, EditableWorld } from './editable-world';
 import { EditSync } from './edit-sync';
-import { GatewayClient } from 'felix-gateway-client';
+import { type Gateway, GatewayClient } from 'felix-gateway-client';
 import { Mesher } from './mesher';
+import { indexedDbStore, openOfflineWorld, type OfflineWorld } from './offline';
 import { HALF_WIDTH, HEIGHT, Player } from './player';
 import { blocksPlayer, lookDirection, raycast, REACH, targetTable } from './raycast';
 import { createLook } from './scene';
@@ -68,7 +70,7 @@ async function join(gateway: string, world: string, token: string) {
  * Starts watching the world's chunks and resolves once the ones players already changed are in the sync. A later change
  * carries no version, so it only tells the sync to read that chunk.
  */
-function watch(client: GatewayClient, sync: EditSync, timing: NonNullable<Window['__timing']>): Promise<void> {
+function watch(client: Gateway, sync: EditSync, timing: NonNullable<Window['__timing']>): Promise<void> {
   const loaded = new Promise<void>((resolve) => {
     client.onCacheEntries = (cache, entries) => {
       if (cache !== 'chunks') return;
@@ -94,7 +96,9 @@ async function run() {
   const gateway = params.get('gateway');
   const worldName = params.get('world');
   const token = params.get('token');
-  let client: GatewayClient | null = null;
+  const offlineName = params.get('offline');
+  let client: Gateway | null = null;
+  let offline: OfflineWorld | null = null;
   let start: WorldStart;
   if (gateway && worldName && token) {
     const joined = await join(gateway, worldName, token);
@@ -107,6 +111,15 @@ async function run() {
       throw e;
     }
     name = worldName;
+  } else if (offlineName) {
+    offline = await openOfflineWorld(indexedDbStore(offlineName), seed, (e) => {
+      console.error('keeping the world in this browser failed', e);
+      status.textContent = `not saved: ${e instanceof Error ? e.message : e}`;
+      status.className = 'fail';
+    });
+    client = offline.client;
+    start = readWorldInfo((await client.cacheGet(INFO_CACHE, infoKey()))!);
+    name = `${offlineName} (offline)`;
   } else {
     start = newWorldStart(seed);
     name = String(seed);
@@ -190,6 +203,7 @@ async function run() {
         await sync.flush();
         await new Promise((r) => setTimeout(r, 50));
       }
+      await offline?.kept();
     },
     dirty: () => sync.dirty,
     saving: client !== null,

@@ -35,6 +35,13 @@ swim in water, and cannot pass through blocks. Left click digs the block you
 look at (up to 6 blocks away), right click places the block picked with 1 to 9
 or the mouse wheel next to it.
 
+To keep a world in your browser without Felix, add `?offline=NAME`
+(`/play.html?offline=mine&seed=11`). The page then talks to an in-memory stand-in
+for the gateway and keeps what you build in IndexedDB, so the world is still
+there after a reload and works with no network. It is made from `?seed=` the
+first time; after that it keeps the seed it was made with. Clearing the site's
+data deletes it.
+
 By default nothing is saved. To build in a world kept in Felix, start the
 [Felix stack](#the-felix-stack), make a world with `blocks-tool` (see there),
 and open the page with the gateway, the world and an ID token for a player of
@@ -96,6 +103,8 @@ and that both are there after a reload. `npm run load -- <url of play.html>
 be there, and reading the world's info and receiving the 500 chunks, plus the
 page taking them in, must fit in two seconds. It prints the time of the first
 frame but does not judge it, because headless Chromium draws in software.
+`npm run offline -- <url of play.html>` needs no Felix: it builds in an offline world, reloads
+and checks that the block and the terrain are still there and that the page opened no connection.
 
 ### The Felix stack
 
@@ -227,7 +236,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Milestone                  | What it proves                                                                   | State                                                                                                                                                |
 | -------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The look, locked           | It looks good, day and night, before Felix is involved                           | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
-| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | In progress: digging and placing saved to a world through the gateway, a world loaded from its info on join; offline mode to do                      |
+| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | Done: digging and placing saved to a world through the gateway, a world loaded from its info on join, offline worlds kept in the browser             |
 | Multiplayer                | Two players in one chunk never overwrite each other                              | Planned. The gateway relays conditional writes since 0.8.0                                                                                           |
 | A world that lasts         | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned                                                                                                                                              |
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |
