@@ -26,10 +26,18 @@
 
 ## Checks
 
-[README.md](README.md#run-it) has the commands. CI runs them all, and `CI ok` is the one check main requires.
+[README.md](README.md#run-it-from-source) has the commands. CI runs them all, and `CI ok` is the one check main requires.
 
 ## Pull requests
 
 - CI must pass before merge. Merges are squash only.
 - No AI attribution in commits or pull request descriptions.
 - List design calls under "Review notes", and Felix gaps you hit under "Felix gaps found", with the issue each one is filed as.
+
+## Releases
+
+A release is a `v*` tag. Before tagging, a pull request bumps the version in `core/Cargo.toml`, `tool/Cargo.toml`,
+`Cargo.lock`, `web/package.json` and `web/package-lock.json`, moves the CHANGELOG entry from "Unreleased" to the new
+version, and updates the version in the README's "Install a release" commands. The release workflow refuses a tag
+that does not match all of them. Pushing the tag builds the files and publishes the release. A pull request that
+touches the release workflow, and a manual run of it, build everything and publish nothing.

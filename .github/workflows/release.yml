@@ -1,0 +1,246 @@
+name: Release
+
+# A v* tag releases that version as one GitHub release: the built web client, blocks-tool for Linux (x86_64) and macOS
+# (arm64), and the compose bundle for the Felix dev stack, each with a .sha256. The notes come from CHANGELOG.md.
+# Felix Blocks has no server of its own, so there are no images; the bundle pulls the published Felix and gateway ones.
+#
+# A pull request that changes this pipeline, and a manual run, build and check everything and publish nothing.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/scripts/**
+      - CHANGELOG.md
+      - dev/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'pull_request' && github.ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to a commit; the comment names the release.
+jobs:
+  plan:
+    name: Check the version and write the notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Plan
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Off a tag, the release being rehearsed is the one in the tree.
+          if [ "$EVENT" = push ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(jq -r .version web/package.json)"
+          fi
+          version="${tag#v}"
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "prerelease=$([[ "$version" == *-* ]] && echo true || echo false)"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: The tag matches every version in the tree
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: python3 .github/scripts/check-release-version.py "$TAG"
+
+      - name: Release notes from CHANGELOG.md
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          python3 .github/scripts/changelog-section.py "$TAG" > notes.md
+          {
+            echo
+            echo "## Install"
+            echo
+            echo "The commands are in the README at this tag:"
+            echo "https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/README.md#install-a-release"
+            echo
+            echo "Each file has a \`.sha256\` next to it. Check a download with \`shasum -a 256 -c <file>.sha256\`."
+          } >> notes.md
+          cat notes.md
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: notes
+          path: notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  web:
+    name: Web client
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2
+        with:
+          tool: wasm-bindgen@0.2.129
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci && npm run core && npm run build
+        working-directory: web
+
+      - name: Package the built web client
+        run: |
+          mkdir -p dist
+          name="felix-blocks-web-${TAG}"
+          cp -a web/dist "$name"
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            --mtime="@$(git log -1 --format=%ct)" -czf "dist/${name}.tar.gz" "$name"
+          tar -tzf "dist/${name}.tar.gz" | head
+
+      # The README tells people to unpack this file and serve it with python3, so play from exactly that.
+      - name: The packaged client plays offline from a static server
+        run: |
+          mkdir unpacked
+          tar -xzf "dist/felix-blocks-web-${TAG}.tar.gz" -C unpacked
+          (cd "unpacked/felix-blocks-web-${TAG}" && exec python3 -m http.server 8000 --bind 127.0.0.1) &
+          up=0
+          for _ in $(seq 1 30); do curl -sf "http://127.0.0.1:8000/play.html" >/dev/null && up=1 && break; sleep 1; done
+          [[ $up -eq 1 ]] || { echo "nothing is serving on port 8000" >&2; exit 1; }
+          cd web
+          npx playwright install --with-deps chromium
+          npm run offline -- http://127.0.0.1:8000/play.html
+          npm run chunks -- http://127.0.0.1:8000/chunks.html
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  tool:
+    name: blocks-tool (${{ matrix.name }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The older Ubuntu image keeps the binary's glibc requirement low enough for most current distributions.
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+          - name: macos-arm64
+            runner: macos-14
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - run: cargo build --release --locked -p blocks-tool
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          name="blocks-tool-${TAG}-${{ matrix.name }}"
+          mkdir "$name"
+          cp target/release/blocks-tool LICENSE "$name/"
+          # The binary must report the version it was released as.
+          "$name/blocks-tool" --version | tee version.txt
+          grep -qx "blocks-tool ${TAG#v}" version.txt
+          tar -czf "dist/${name}.tar.gz" "$name"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tool-${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  bundle:
+    name: Compose bundle
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Bundle the dev stack
+        run: |
+          mkdir -p dist stage
+          .github/scripts/make-compose-bundle.sh "$TAG" stage
+          name="felix-blocks-compose-${TAG}"
+          grep -h 'image: ' "stage/${name}/compose.yml" | sort -u
+          (cd "stage/${name}" && docker compose config --quiet)
+          tar -C stage --sort=name --owner=0 --group=0 --numeric-owner \
+            --mtime="@$(git log -1 --format=%ct)" -czf "dist/${name}.tar.gz" "${name}"
+          tar -tzf "dist/${name}.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bundle
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish
+    needs: [plan, web, tool, bundle]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+      # There is no checkout here for gh to find the repository in.
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: '{notes,web,tool-*,bundle}'
+          path: parts
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd parts
+          ls -l
+          for f in *.tar.gz; do sha256sum "$f" > "$f.sha256"; done
+          cat ./*.sha256
+          # Exactly the four files the README names, each with a checksum.
+          [ "$(ls -1 ./*.tar.gz | wc -l)" -eq 4 ] || { echo "::error::expected four tarballs"; exit 1; }
+
+      - name: Publish the release
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" --verify-tag --title "Felix Blocks ${TAG}" \
+            "${flags[@]}" --notes-file parts/notes.md parts/*.tar.gz parts/*.sha256
