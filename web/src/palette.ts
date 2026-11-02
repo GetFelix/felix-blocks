@@ -27,3 +27,34 @@ export const UI = {
   text: '#e8eef3',
   muted: '#93a3b1',
 } as const;
+
+type Rgb = readonly [number, number, number];
+
+/**
+ * How the atlas restyles a tile when it is built. Tiles not listed here are used as they are.
+ * `tint` recolours the green pixels by brightness; `saturate` and `brightness` work like the CSS filters of the
+ * same names; `underlay` is a colour drawn behind the tile so glass reads as glass and not as holes.
+ */
+export interface TileStyle {
+  tint?: Rgb;
+  saturate?: number;
+  brightness?: number;
+  underlay?: readonly [number, number, number, number];
+}
+
+export const TILE_STYLES: Readonly<Record<string, TileStyle>> = {
+  grass_top: { tint: TINT.grass },
+  dirt_grass: { tint: TINT.grass },
+  leaves_transparent: { tint: TINT.leaves },
+  grass1: { tint: TINT.tuft },
+  grass2: { tint: TINT.tuft },
+  grass3: { tint: TINT.tuft },
+  grass4: { tint: TINT.tuft },
+  stone: { saturate: 0.7 },
+  greystone: { saturate: 0.6, brightness: 1.3 },
+  gravel_stone: { saturate: 0.7 },
+  stone_coal: { saturate: 0.7 },
+  stone_iron: { saturate: 0.7 },
+  wood_red: { saturate: 0.85 },
+  glass: { underlay: [205, 235, 250, 0.28] },
+};

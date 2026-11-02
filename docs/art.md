@@ -37,6 +37,8 @@ on a transparent background, such as `rock_moss`, cannot be cube faces.
 Grass, leaves and plants are recoloured by brightness, the way a biome tint
 works, so the tile's texture stays and only the hue changes. Stone is slightly
 desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
+`TILE_STYLES` in `web/src/palette.ts` lists the restyle for each tile and
+`web/src/tiles.ts` applies it when the atlas is built.
 
 ## Rules
 
@@ -49,7 +51,10 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
   loaded world never shows as an edge.
 - **Textures are crisp up close.** Nearest-neighbour magnification, mipmaps for
   distance, and 16 px of padding around each tile in the atlas so mipmaps never
-  bleed a neighbour in.
+  bleed a neighbour in. The padding repeats the tile's edge pixels and is enough
+  for mip levels 0 to 4, down to a tile 8 pixels wide on screen.
+  `/atlas.html` draws every tile at several sizes, and CI compares each with the
+  same tile on its own.
 - **Three passes.** Opaque blocks, cut-out blocks (leaves, plants) with an alpha
   test so they cast proper shadows, and blended water and glass last. Water sits
   0.12 below the block top so shorelines read.
