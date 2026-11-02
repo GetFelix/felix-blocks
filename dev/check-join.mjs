@@ -7,8 +7,10 @@ import assert from 'node:assert/strict';
 const GATEWAY = process.argv[2] ?? 'ws://127.0.0.1:8787/ws';
 const IDP = process.argv[3] ?? 'http://127.0.0.1:9400';
 const AUDIENCE = 'felix-blocks';
-// The first chunk of region (0, 0), as core/ names it.
-const KEY = 'R8000_8000-000';
+// A chunk key of region (0, 0), as core/ names it, that this run alone writes: the cache keeps what was written, so a
+// second run against the same stack would otherwise find the key taken. The last digit is the chunk's height.
+const hex = (n) => Math.floor(Math.random() * n).toString(16);
+const KEY = `R8000_8000-0${hex(8)}${hex(16)}`;
 
 async function idToken(subject) {
   const response = await fetch(`${IDP}/token?sub=${subject}&aud=${AUDIENCE}`);
@@ -55,17 +57,22 @@ function open(url) {
 }
 
 async function join(subject, world) {
-  const session = open(GATEWAY);
-  await session.opened;
-  session.send({
-    type: 'join',
-    protocol: 1,
-    features: ['cache_versions'],
-    world,
-    token: await idToken(subject),
-  });
-  const answer = await session.next((m) => m.type === 'hello' || m.type === 'error', 'hello');
-  return { session, answer };
+  // Right after the stack comes up, the broker may not yet lead the world's shards; that is `unavailable`, and it passes.
+  for (let attempt = 1; ; attempt++) {
+    const session = open(GATEWAY);
+    await session.opened;
+    session.send({
+      type: 'join',
+      protocol: 1,
+      features: ['cache_versions'],
+      world,
+      token: await idToken(subject),
+    });
+    const answer = await session.next((m) => m.type === 'hello' || m.type === 'error', 'hello');
+    if (answer.code !== 'unavailable' || attempt === 10) return { session, answer };
+    session.close();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
 }
 
 const b64 = (text) => Buffer.from(text).toString('base64');

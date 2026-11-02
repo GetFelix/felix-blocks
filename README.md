@@ -41,8 +41,8 @@ npm run dev     # the asset page at http://localhost:5173, then /atlas.html and 
 ```
 
 The checks CI runs are `npm run format:check`, `npm run typecheck`, `npm test`
-and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
-`cargo test` at the root. `npm run assets -- <url>` opens a served page in
+and `npm run build` in `web/`, `cargo fmt --check`, `cargo clippy` and
+`cargo test` at the root, and the Felix stack below. `npm run assets -- <url>` opens a served page in
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
 distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
@@ -54,8 +54,11 @@ does not look like the separate blocks it replaces.
 `dev/up.sh` starts Felix on your machine: a broker, the control plane, a
 stand-in sign-in provider and [felix-gateway](https://github.com/GetFelix/felix-gateway)
 0.8.0, the first gateway that relays conditional cache writes. It needs Docker
-or Podman with Compose v2. It also creates one world, `demo`, that the players
-`ana` and `ben` may join.
+or Podman with Compose v2 (or podman-compose 1.4 or later), Node 22 for the
+check, and these ports free on localhost: 5000/udp, 8080, 8443, 8787 and 9400.
+It also creates one world, `demo`, that the players `ana` and `ben` may join.
+The world starts empty: its info cache holds nothing until `blocks-tool` writes
+it.
 
 ```bash
 dev/up.sh                  # start the stack and wait until the gateway serves

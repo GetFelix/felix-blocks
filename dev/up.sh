@@ -17,7 +17,8 @@ for _ in $(seq 1 90); do
   # The broker refuses cache watches and writes until the control plane has granted it a lease on its shards.
   if [[ -f state/seeded && -f state/finalized ]] \
     && curl -fsS http://127.0.0.1:8080/ready >/dev/null 2>&1 \
-    && curl -fsS http://127.0.0.1:8080/metrics 2>/dev/null | grep -Eq '^felix_broker_lease_held(\{[^}]*\})? 1' \
+    && metrics="$(curl -fsS http://127.0.0.1:8080/metrics 2>/dev/null)" \
+    && grep -Eq '^felix_broker_lease_held(\{[^}]*\})? 1$' <<<"$metrics" \
     && curl -fsS http://127.0.0.1:8787/oidc >/dev/null 2>&1; then
     echo "Felix is up, with the world demo open to ana and ben."
     echo "  gateway:   ws://127.0.0.1:8787/ws, sign-in at http://127.0.0.1:9400"
