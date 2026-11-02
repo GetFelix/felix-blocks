@@ -22,13 +22,28 @@ export async function idToken(user) {
 export async function openAs(browser, url, world, user, errors) {
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   page.on('pageerror', (e) => errors.push(`${user}: ${e}`));
-  page.on('console', (m) => m.type() === 'error' && errors.push(`${user}: ${m.text()}`));
+  const log = [];
+  page.on('console', (m) => {
+    log.push(`${m.type()}: ${m.text()}`);
+    if (m.type() === 'error') errors.push(`${user}: ${m.text()}`);
+  });
   const where = new URL(url);
   where.searchParams.set('gateway', GATEWAY);
   where.searchParams.set('world', world);
   where.searchParams.set('token', await idToken(user));
   await page.goto(where.href, { waitUntil: 'load', timeout: 120_000 });
-  await page.waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 300_000 });
+  await page
+    .waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 300_000 })
+    .catch(async (e) => {
+      const state = await page
+        .evaluate(
+          () => `status "${document.getElementById('status').textContent}", timing ${JSON.stringify(window.__timing)}`,
+        )
+        .catch(() => 'page state unavailable');
+      throw new Error(
+        `${user}'s page never became ready (${state}); console: ${log.slice(-10).join(' | ')}; ${e.message}`,
+      );
+    });
   const status = await page.evaluate(() => document.getElementById('status').textContent);
   if (!(await page.evaluate(() => window.__edit?.saving))) throw new Error(`${user}'s page is not saving: ${status}`);
   return page;
