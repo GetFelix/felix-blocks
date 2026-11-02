@@ -107,6 +107,8 @@ fn keys_that_are_not_canonical_are_not_chunks() {
         "R7fff_8000-000",
         "R+000_8000-000",
         "R8000_8000-00g",
+        // 14 bytes, but the cut at byte 12 falls inside a character.
+        "R8000_8000-\u{e9}0",
     ] {
         assert_eq!(ChunkPos::from_key(key), None, "{key}");
     }

@@ -145,9 +145,15 @@ generated chunk; a sparse value lists only the cells that differ and needs the
 generated chunk to be read first. The run-length coding is in groups: a control
 byte under 128 is followed by that many plus one literal blocks, and a control
 byte of 128 or more is followed by one block repeated that many minus 126 times
-(2 to 129). The decoder refuses a value that is cut short, has a format it does
-not know, holds a cell out of order or outside the chunk, or does not make
-exactly 4,096 blocks. The code is `core/src/delta.rs`.
+(2 to 129). The decoder refuses a value that is cut short, has bytes left over, has a
+format it does not know, holds a cell out of order or outside the chunk, holds
+the not-loaded byte (255), or does not make exactly 4,096 blocks. It also
+refuses a sparse value read over a chunk from a different generator version,
+since the changes would land on the wrong terrain. It accepts any other block
+id, so a client that predates a new block still reads the chunk, and it accepts
+any run-length layout that decodes, so two different byte strings can make the
+same chunk: compare chunks by their blocks, not their stored bytes. The code is
+`core/src/delta.rs`.
 
 Sparse wins up to 1,375 changed cells when nothing in the chunk repeats, and
 for much more when it does, which covers almost every chunk in a normal world.
@@ -183,10 +189,10 @@ width, so one prefix covers a region and never matches a neighbour:
 
 ```
 R<rx:4 hex>_<rz:4 hex>-<lx:1 hex><lz:1 hex><cy:1 hex>
-R8000_8003-365        region (0x8000, 0x8003), chunk (3, 6) in it, height 5
+R8000_8003-365        region (0, 3) written with the offset, chunk (3, 6) in it, height 5
 ```
 
-Region coordinates are offset by `0x8000` so they stay unsigned. The prefix
+Region coordinates are written plus `0x8000`, which keeps the digits fixed width and leaves room for regions below zero if a world ever grows that way. The prefix
 `R8000_8003-` is exactly one region's chunks. `lx` and `lz` run from 0 to 7,
 since a region is 8 x 8 chunks. Hex digits are lowercase, and a key spelled any
 other way names no chunk. `core/src/key.rs` makes and reads the keys, and its

@@ -27,7 +27,7 @@ fn a_chunk_nobody_changed_is_an_empty_sparse_value() {
     let chunk = noise();
     let value = encode(1, &chunk, &chunk);
     assert_eq!(value, [1, 1, 0, 0]);
-    assert_eq!(apply(&value, &chunk).unwrap(), chunk);
+    assert_eq!(apply(&value, 1, &chunk).unwrap(), chunk);
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn the_dense_layout_is_fixed() {
     }
     want.extend([94 + 126, 8]);
     assert_eq!(dense, want);
-    assert_eq!(apply(&dense, &filled(0)).unwrap(), current);
+    assert_eq!(apply(&dense, 1, &filled(0)).unwrap(), current);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn a_few_edits_stay_sparse_at_three_bytes_a_cell() {
     let value = encode(1, &generated, &current);
     assert_eq!(value[0], SPARSE);
     assert_eq!(value.len(), 4 + 3 * 300);
-    assert_eq!(apply(&value, &generated).unwrap(), current);
+    assert_eq!(apply(&value, 1, &generated).unwrap(), current);
 }
 
 #[test]
@@ -79,8 +79,8 @@ fn a_rebuilt_chunk_is_dense_and_small() {
     assert_eq!(value[0], DENSE);
     assert_eq!(value.len(), 2 + 2 * 32);
     // A dense value is the whole chunk, so it reads the same over any generated chunk.
-    assert_eq!(apply(&value, &generated).unwrap(), current);
-    assert_eq!(apply(&value, &filled(0)).unwrap(), current);
+    assert_eq!(apply(&value, 1, &generated).unwrap(), current);
+    assert_eq!(apply(&value, 1, &filled(0)).unwrap(), current);
 }
 
 /// Cells that cannot be run-length encoded cost 4,130 bytes dense, so sparse wins up to 1,375 changed cells.
@@ -106,7 +106,7 @@ fn no_value_is_longer_than_the_worst_case() {
         let current: Vec<u8> = (0..CELLS).map(|_| (rng.next() % 16) as u8).collect();
         let value = encode(1, &generated, &current);
         assert!(value.len() <= 4130, "{} bytes", value.len());
-        assert_eq!(apply(&value, &generated).unwrap(), current);
+        assert_eq!(apply(&value, 1, &generated).unwrap(), current);
     }
 }
 
@@ -117,7 +117,7 @@ fn short_runs_never_make_a_value_longer_than_literals_would() {
         let current: Vec<u8> = (0..CELLS).map(|i| 1 + (i / run % 2) as u8).collect();
         let value = encode(1, &filled(0), &current);
         assert!(value.len() <= 4130, "runs of {run}: {} bytes", value.len());
-        assert_eq!(apply(&value, &filled(0)).unwrap(), current);
+        assert_eq!(apply(&value, 1, &filled(0)).unwrap(), current);
     }
 }
 
@@ -142,7 +142,11 @@ fn edits_of_every_size_read_back() {
         }
         let value = encode(3, &generated, &current);
         assert_eq!(generator_version(&value), Ok(3));
-        assert_eq!(apply(&value, &generated).unwrap(), current, "round {round}");
+        assert_eq!(
+            apply(&value, 3, &generated).unwrap(),
+            current,
+            "round {round}"
+        );
     }
 }
 
@@ -158,7 +162,7 @@ fn runs_and_literals_split_at_their_longest() {
             current[edge..edge + len].fill(9);
             let dense = encode_dense(1, &current);
             assert_eq!(
-                apply(&dense, &filled(0)).unwrap(),
+                apply(&dense, 1, &filled(0)).unwrap(),
                 current,
                 "run {len} at {edge}"
             );
@@ -169,7 +173,7 @@ fn runs_and_literals_split_at_their_longest() {
 #[test]
 fn a_value_that_is_cut_or_broken_is_refused() {
     let base = filled(3);
-    let at = |value: &[u8]| apply(value, &base);
+    let at = |value: &[u8]| apply(value, 1, &base);
     assert_eq!(at(&[]), Err(DecodeError::Truncated));
     assert_eq!(at(&[1]), Err(DecodeError::Truncated));
     assert_eq!(at(&[0, 1, 0, 0]), Err(DecodeError::UnknownFormat(0)));
@@ -218,4 +222,21 @@ fn a_value_that_is_cut_or_broken_is_refused() {
 #[should_panic(expected = "not a block")]
 fn the_unloaded_marker_cannot_be_written() {
     encode(1, &filled(3), &filled(UNLOADED));
+}
+
+#[test]
+fn a_sparse_value_is_only_read_over_the_generator_it_was_written_on() {
+    let generated = filled(3);
+    let mut current = generated.clone();
+    current[10] = 5;
+    let sparse = encode(1, &generated, &current);
+    assert_eq!(apply(&sparse, 1, &generated).unwrap(), current);
+    assert_eq!(
+        apply(&sparse, 2, &generated),
+        Err(DecodeError::GeneratorMismatch { value: 1, have: 2 })
+    );
+    // A dense value is the whole chunk, so it reads over any generator.
+    let dense = encode(1, &filled(0), &noise());
+    assert_eq!(dense[0], 2);
+    assert_eq!(apply(&dense, 2, &generated).unwrap(), noise());
 }

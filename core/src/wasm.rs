@@ -94,11 +94,12 @@ pub fn encode_chunk(version: u8, generated: &[u8], current: &[u8]) -> Result<Vec
     Ok(crate::delta::encode(version, generated, current))
 }
 
-/// [`crate::delta::apply`]. Throws if `generated` is not 4,096 bytes or the value is not one `encodeChunk` could write.
+/// [`crate::delta::apply`]. `version` is the generator version `generated` was made with. Throws if `generated` is
+/// not 4,096 bytes, the value is malformed, or it is sparse and was written on another generator version.
 #[wasm_bindgen(js_name = applyChunk)]
-pub fn apply_chunk(value: &[u8], generated: &[u8]) -> Result<Vec<u8>, JsError> {
+pub fn apply_chunk(value: &[u8], version: u8, generated: &[u8]) -> Result<Vec<u8>, JsError> {
     whole_chunk(generated)?;
-    crate::delta::apply(value, generated).map_err(|e| JsError::new(&e.to_string()))
+    crate::delta::apply(value, version, generated).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// [`crate::delta::generator_version`]. Throws for a value that is not a chunk value.

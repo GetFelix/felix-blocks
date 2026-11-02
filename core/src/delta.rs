@@ -42,6 +42,8 @@ pub enum DecodeError {
     WrongLength,
     /// The marker for a cell with no chunk loaded, which is never a block.
     NotABlock,
+    /// A sparse value written on one generator, read over the chunk of another.
+    GeneratorMismatch { value: u8, have: u8 },
 }
 
 impl fmt::Display for DecodeError {
@@ -56,6 +58,9 @@ impl fmt::Display for DecodeError {
             DecodeError::CellsNotAscending => "the changed cells are not in ascending order",
             DecodeError::WrongLength => "the chunk value does not hold 4096 blocks",
             DecodeError::NotABlock => "the chunk value holds a byte that is not a block",
+            DecodeError::GeneratorMismatch { .. } => {
+                "the chunk value was edited on another generator version than the one that made the chunk"
+            }
         })
     }
 }
@@ -148,13 +153,20 @@ fn format(value: &[u8]) -> Result<u8, DecodeError> {
 /// The chunk a stored value makes: `generated` with the value's changes on top, or for a dense value the blocks it
 /// holds. A sparse value must list its cells in ascending order, as [`encode`] writes them.
 ///
+/// `version` is the generator version `generated` was made with. A sparse value only means something over the
+/// generator it was written on, so one written on another is refused instead of applied over the wrong terrain.
+///
 /// # Panics
 /// If `generated` is not [`CELLS`] bytes.
-pub fn apply(value: &[u8], generated: &[u8]) -> Result<Vec<u8>, DecodeError> {
+pub fn apply(value: &[u8], version: u8, generated: &[u8]) -> Result<Vec<u8>, DecodeError> {
     assert_eq!(generated.len(), CELLS, "a chunk is {CELLS} bytes");
     let format = format(value)?;
     let body = &value[HEADER..];
     match format {
+        SPARSE if value[1] != version => Err(DecodeError::GeneratorMismatch {
+            value: value[1],
+            have: version,
+        }),
         SPARSE => apply_sparse(body, generated),
         _ => decode_dense(body),
     }

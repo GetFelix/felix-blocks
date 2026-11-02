@@ -29,13 +29,14 @@ test('an edited generated chunk is stored as its changes and reads back', () => 
   const value = encodeValue(1, generated, current);
   expect(value).toHaveLength(4 + 3 * 2);
   expect(valueVersion(value)).toBe(1);
-  expect(decodeValue(value, generated)).toEqual(current);
+  expect(decodeValue(value, 1, generated)).toEqual(current);
+  expect(() => decodeValue(value, 2, generated)).toThrow(/generator/);
 });
 
 test('a chunk is refused if it is the wrong size or holds the not-loaded marker', () => {
   const chunk = new Uint8Array(4096);
   expect(() => encodeValue(1, chunk, new Uint8Array(10))).toThrow();
   expect(() => encodeValue(1, chunk, new Uint8Array(4096).fill(255))).toThrow();
-  expect(() => decodeValue(new Uint8Array([9, 1]), chunk)).toThrow(/format/);
+  expect(() => decodeValue(new Uint8Array([9, 1]), 1, chunk)).toThrow(/format/);
   expect(() => valueVersion(new Uint8Array())).toThrow();
 });

@@ -3,11 +3,11 @@
 //!
 //! ```text
 //! R<rx:4 hex>_<rz:4 hex>-<lx:1 hex><lz:1 hex><cy:1 hex>
-//! R8000_8003-365          region (0x8000, 0x8003), chunk (3, 6) in it, height 5
+//! R8000_8003-365          region (0, 3), written with the offset, chunk (3, 6) in it, height 5
 //! ```
 //!
-//! A region is 8 x 8 chunks across the full height. Region coordinates are offset by `0x8000` so they stay
-//! unsigned. Keys are 14 characters of letters, digits and `_` or `-`, which is what the gateway accepts.
+//! A region is 8 x 8 chunks across the full height. Region coordinates are written plus `0x8000`, which keeps the
+//! digits fixed width and leaves room for regions below zero if a world ever grows that way. Keys are 14 characters of letters, digits and `_` or `-`, which is what the gateway accepts.
 
 use crate::worldgen::WORLD_CHUNKS;
 
@@ -61,7 +61,8 @@ impl ChunkPos {
     /// The chunk a key names, or `None` for a key that [`ChunkPos::key`] would not have made.
     pub fn from_key(key: &str) -> Option<ChunkPos> {
         let b = key.as_bytes();
-        if b.len() != KEY_LEN || b[0] != b'R' || b[5] != b'_' || b[10] != b'-' {
+        // Slicing below cuts at byte offsets, so a key with a multi-byte character must not get that far.
+        if !key.is_ascii() || b.len() != KEY_LEN || b[0] != b'R' || b[5] != b'_' || b[10] != b'-' {
             return None;
         }
         let rx = hex(&key[1..5])? - REGION_OFFSET;

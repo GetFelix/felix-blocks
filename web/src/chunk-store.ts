@@ -25,8 +25,13 @@ export const prefixOf = (rx: number, rz: number): string => regionPrefix(rx, rz)
 export const encodeValue = (version: number, generated: Uint8Array, current: Uint8Array): Uint8Array =>
   encodeChunk(version, generated, current);
 
-/** The chunk a stored value makes over `generated`. Throws if the value is not one `encodeValue` could have written. */
-export const decodeValue = (value: Uint8Array, generated: Uint8Array): Uint8Array => applyChunk(value, generated);
+/**
+ * The chunk a stored value makes over `generated`, which the generator of `version` made. Throws if the value is
+ * malformed, or is a list of changes written on another generator version. Block ids the table does not have are
+ * read as they are, so a newer client's blocks do not fail an older one.
+ */
+export const decodeValue = (value: Uint8Array, version: number, generated: Uint8Array): Uint8Array =>
+  applyChunk(value, version, generated);
 
 /** The generator version a stored value was edited on. Throws if the value is not a chunk value. */
 export const valueVersion = (value: Uint8Array): number => valueGeneratorVersion(value);
