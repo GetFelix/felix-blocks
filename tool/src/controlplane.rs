@@ -48,7 +48,7 @@ impl ControlPlane {
             .await
             .with_context(|| format!("reach the control plane at {url}"))?;
         match response.status() {
-            // Already there, which makes a second run of `create` harmless.
+            // Already there, which makes a second run of `create` harmless. Its settings are not compared.
             StatusCode::CONFLICT => Ok(()),
             status if status.is_success() => Ok(()),
             status => {

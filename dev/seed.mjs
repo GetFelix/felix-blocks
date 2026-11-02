@@ -158,9 +158,9 @@ await writeFile(`${STATE}/node.token`, broker, { mode: 0o644 });
 console.log(`wrote node.token to ${STATE}`);
 
 // The administrator's tokens for blocks-tool: one for the control plane, one for the broker's caches.
-await writeFile(`${STATE}/admin.token`, admin, { mode: 0o644 });
+await writeFile(`${STATE}/admin.token`, admin, { mode: 0o600 });
 const adminData = await exchange('blocks-admin', { requested: ['cache.read', 'cache.write'] });
-await writeFile(`${STATE}/admin-data.token`, adminData, { mode: 0o644 });
+await writeFile(`${STATE}/admin-data.token`, adminData, { mode: 0o600 });
 console.log(`wrote admin.token and admin-data.token to ${STATE}`);
 
 // up.sh waits for this before it calls the stack ready.

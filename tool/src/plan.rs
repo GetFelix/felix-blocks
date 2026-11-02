@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 /// The longest world name. It sits inside resource names, which Felix limits.
 const MAX_NAME: usize = 32;
 
-/// Caches of a world: the resource name, and whether it expires.
+/// The names of a world's caches and streams, before the world is added to them.
 pub(crate) const CHUNKS: &str = "chunks";
 pub(crate) const INFO: &str = "info";
 pub(crate) const ONLINE: &str = "online";

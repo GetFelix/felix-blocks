@@ -219,7 +219,7 @@ four steps, in this order so that nobody can join a world that has no info:
 1. Create the world's caches and streams through the control plane's REST API.
 2. Read the info cache. If it holds a value, keep it (and refuse a `--seed` that
    differs). If not, write a new one: the seed, the newest generator version,
-   the world's size, and a spawn point on the dry ground nearest the middle.
+   the world's size, and a spawn point on dry ground near the middle.
 3. Add the policies of `role:world-<world>`, which holds what a session in the
    world needs and no more.
 4. Put the owner in that role. Felix names a person by `sha256(issuer|subject)`,

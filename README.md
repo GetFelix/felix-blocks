@@ -84,7 +84,8 @@ export BLOCKS_ISSUER=http://127.0.0.1:9400 \
   BLOCKS_FELIX_DATA_TOKEN_FILE=dev/state/admin-data.token \
   BLOCKS_FELIX_CA_FILE=dev/state/broker-cert.pem
 target/debug/blocks-tool create play --owner ana --seed 7
-BLOCKS_WORLD=play node dev/check-join.mjs   # needs ana and ben both in the world
+target/debug/blocks-tool create play --owner ben
+BLOCKS_WORLD=play node dev/check-join.mjs   # joins as ana and ben
 ```
 
 `create` registers the world's caches and streams with the control plane,
@@ -99,7 +100,9 @@ create --help` lists the other options, and each also reads an environment
 variable (`BLOCKS_FELIX_CONTROL_PLANE`, `BLOCKS_FELIX_BROKER`,
 `BLOCKS_FELIX_SERVER_NAME`, `BLOCKS_TENANT`, `BLOCKS_NAMESPACE`). The tokens
 are for the tenant's administrator; the data token is the one the broker
-checks for cache reads and writes.
+checks for cache reads and writes, so the administrator needs `cache.read` and
+`cache.write` on the world's caches (`dev/seed.mjs` grants them for the dev
+stack, where the tokens last 24 hours).
 
 The browser connects to `ws://127.0.0.1:8787/ws`, and signs in at
 `http://127.0.0.1:9400`, which lets anyone pick a name. The stand-in provider

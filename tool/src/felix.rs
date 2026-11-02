@@ -41,7 +41,10 @@ where
     for _ in 0..tries {
         match attempt().await {
             Ok(value) => return Ok(value),
-            Err(err) => last = Some(err),
+            Err(err) => {
+                eprintln!("{what}: {err:#}; trying again");
+                last = Some(err);
+            }
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

@@ -47,17 +47,22 @@ pub enum DecodeError {
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            DecodeError::WrongLength => "the world info is not 24 bytes",
-            DecodeError::UnknownFormat(_) => "the world info has a format this build does not know",
-        })
+        match self {
+            DecodeError::WrongLength => write!(f, "the world info is not {LEN} bytes"),
+            DecodeError::UnknownFormat(format) => {
+                write!(
+                    f,
+                    "the world info has format {format}, which this build does not know"
+                )
+            }
+        }
     }
 }
 
 impl std::error::Error for DecodeError {}
 
 impl WorldInfo {
-    /// The info of a new world made with the newest generator. The spawn point is the dry ground nearest the
+    /// The info of a new world made with the newest generator. The spawn point is dry ground near the
     /// middle of the world, so nobody starts in a lake.
     pub fn new(seed: u32) -> WorldInfo {
         let version = GENERATOR_VERSION;
@@ -103,7 +108,8 @@ impl WorldInfo {
     }
 }
 
-/// Whether the two blocks at `y` and above in the column are air, so a player fits there and no tree is in the way.
+/// Whether the block at `y - 1` is solid and the two at `y` and above in the column are air, so a player stands there
+/// and no tree is in the way. Ground height is taken before caves, so a cave can open under the spawn.
 fn standing_room(version: u8, seed: u32, x: i32, y: i32, z: i32) -> bool {
     let size = SIZE as i32;
     let chunk = |y: i32| {
@@ -115,16 +121,16 @@ fn standing_room(version: u8, seed: u32, x: i32, y: i32, z: i32) -> bool {
             z.div_euclid(size),
         )
     };
-    let air = |y: i32| {
-        chunk(y).is_some_and(|blocks| {
+    let block = |y: i32| {
+        chunk(y).map(|blocks| {
             blocks[cell(
                 x.rem_euclid(size) as usize,
                 y.rem_euclid(size) as usize,
                 z.rem_euclid(size) as usize,
-            )] == AIR
+            )]
         })
     };
-    air(y) && air(y + 1)
+    block(y - 1).is_some_and(|b| b != AIR) && block(y) == Some(AIR) && block(y + 1) == Some(AIR)
 }
 
 /// The first dry column found walking outwards in squares from `middle`, standing on top of its ground. A world

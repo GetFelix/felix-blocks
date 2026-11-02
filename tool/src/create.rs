@@ -3,6 +3,7 @@
 use anyhow::{Context, Result, bail};
 use bytes::Bytes;
 use felix_blocks_core::info::{self, WorldInfo};
+use felix_client::CacheCondition;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -37,12 +38,42 @@ pub(crate) async fn run(args: CreateArgs) -> Result<()> {
 
     let client = felix::connect(&args.felix, &data_token).await?;
     let info_cache = plan::resource(plan::INFO, world);
-    let stored = felix::retry("read the world's info", TRIES, || {
+    let mut stored = felix::retry("read the world's info", TRIES, || {
         client.cache_get(tenant, namespace, &info_cache, info::KEY)
     })
     .await?;
-    let info = match stored {
-        Some(value) => {
+    let mut wrote = None;
+    if stored.is_none() {
+        // Written only if still absent, so two creates at once cannot both think they made the world.
+        let new = WorldInfo::new(args.seed.unwrap_or_else(random_seed));
+        let value = Bytes::copy_from_slice(&new.encode());
+        let result = felix::retry("write the world's info", TRIES, || {
+            client.cache_put_if(
+                tenant,
+                namespace,
+                &info_cache,
+                info::KEY,
+                value.clone(),
+                None,
+                CacheCondition::Absent,
+            )
+        })
+        .await?;
+        if result.applied {
+            wrote = Some(new);
+        } else {
+            stored = felix::retry("read the world's info", TRIES, || {
+                client.cache_get(tenant, namespace, &info_cache, info::KEY)
+            })
+            .await?;
+        }
+    }
+    let info = match (wrote, stored) {
+        (Some(new), _) => {
+            println!("wrote the info of {world} (seed {})", new.seed);
+            new
+        }
+        (None, Some(value)) => {
             let stored = WorldInfo::decode(&value).context("the world's info is unreadable")?;
             if args.seed.is_some_and(|seed| seed != stored.seed) {
                 bail!(
@@ -53,23 +84,7 @@ pub(crate) async fn run(args: CreateArgs) -> Result<()> {
             println!("{world} already has its info (seed {})", stored.seed);
             stored
         }
-        None => {
-            let new = WorldInfo::new(args.seed.unwrap_or_else(random_seed));
-            let value = Bytes::copy_from_slice(&new.encode());
-            felix::retry("write the world's info", TRIES, || {
-                client.cache_put(
-                    tenant,
-                    namespace,
-                    &info_cache,
-                    info::KEY,
-                    value.clone(),
-                    None,
-                )
-            })
-            .await?;
-            println!("wrote the info of {world} (seed {})", new.seed);
-            new
-        }
+        (None, None) => bail!("the info of {world} was refused as present, then read as absent"),
     };
 
     for policy in plan::policies(tenant, namespace, world) {

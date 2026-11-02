@@ -51,7 +51,7 @@ fn a_new_world_uses_the_newest_generator_and_the_whole_world() {
 
 #[test]
 fn the_spawn_point_is_dry_with_room_to_stand() {
-    for seed in 0..40 {
+    for seed in 0..200 {
         let info = WorldInfo::new(seed);
         let [x, y, z] = info.spawn;
         let ground = ground_height(1, seed, x, z).unwrap();
