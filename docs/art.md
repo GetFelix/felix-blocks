@@ -111,11 +111,35 @@ directions; the unit tests in `web/src/view-distance.test.ts` cover that. Whethe
 chunks is not something headless Chromium can answer, because it renders in software. It has to be measured on the
 hardware:
 
-1. On a laptop with an integrated GPU, serve the site (`npm run dev` in `web/`) and open
-   `/chunks.html?tier=8&debug=1`.
+1. On a laptop with an integrated GPU, serve the site and open `/chunks.html?tier=8&debug=1`. Either run `npm run dev`
+   in `web/`, or serve the built site from CI without npm (see below).
 2. Let the walk finish and read `fps` in the panel. It should stay at 60.
 3. Open `/chunks.html?adapt=1` to see where the distance settles. It starts at 8, steps down if the frames are late,
    and climbs back one tier at a time if they are not.
+
+To skip npm, use the built site. CI uploads it as the `web-dist` artifact, but only on runs where the `web` job got that
+far, so pick a successful run. You need the [GitHub CLI](https://cli.github.com) (`gh`) signed in; the artifact is also
+a download on the run's page in the Actions tab.
+
+```sh
+gh run list -R GetFelix/felix-blocks --branch main --status success --limit 1 --json databaseId
+gh run download <run id> -R GetFelix/felix-blocks -n web-dist -D web-dist
+cd web-dist && python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/chunks.html?tier=8&debug=1`.
+
+**Measured (2 November 2026).** This was done on a Mac Studio with an Apple M4 Max, a fast desktop GPU, using the
+`web-dist` artifact of CI run 41505762155 on main. The panel caps at the display's 60 fps, so "60 fps" means at least 60,
+and these numbers are an upper bound, not the laptop check above.
+
+- `/chunks.html?tier=8&debug=1`: the panel read 60 fps at 8 chunks after the walk.
+- `/chunks.html?adapt=1`: the distance climbed from 8 to 9, 10 and 11 chunks, each step reported as "steady, 16.7 ms".
+  It held 60 fps at 11 chunks, with 3016 chunks loaded and none meshing. 11 is one short of the maximum of 12; the
+  distance was at 11 when it was read.
+
+The laptop target is unverified: no laptop hardware was available. The steps above are how anyone with a laptop can
+check it.
 
 ## Night
 
