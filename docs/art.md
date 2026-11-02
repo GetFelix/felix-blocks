@@ -15,6 +15,10 @@ flat tiles. The reference is [prototype/style-frame.html](../prototype/style-fra
 | Voxel Pack | Block textures, plants | 128 px tiles, flat cartoon shading, one family |
 | Blocky Characters | Other players | Rigged GLB with `idle`, `walk`, `interact-right` and more; faces +z; scaled to 1.8 blocks |
 
+The files are in `web/assets/`, with `CREDITS.md` listing each pack's source and
+licence. The block table in `core/src/blocks.rs` says which tile each face of
+each block uses, and the colours below are in `web/src/palette.ts`.
+
 Considered and left out for now: the Block Pack (3D blocks, useful later for store
 art) and the Survival Kit (held items and props). Voxel Pack tiles that are sprites
 on a transparent background, such as `rock_moss`, cannot be cube faces.

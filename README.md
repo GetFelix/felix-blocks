@@ -12,13 +12,39 @@ browsers write the world, and Felix stores it, orders the writes and tells
 everyone what changed.
 
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
-> the look, day and night; nothing is playable yet. The plan is in
+> the look, day and night; nothing is playable yet. The project's code is
+> started: the block table and the asset pipeline. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
 | Day | Night |
 |---|---|
 | ![Felix Blocks style frame, first person by day](docs/screenshots/style-frame-first-person.jpg) | ![Felix Blocks style frame, first person at night](docs/screenshots/style-frame-night.jpg) |
+
+## Run it
+
+There is nothing to play yet. What runs today is the asset page, which loads
+every block texture and character the game uses, the way the game loads them.
+
+You need Node 22, Rust 1.97 with the `wasm32-unknown-unknown` target (`rustup`
+installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
+(`cargo install wasm-bindgen-cli --version 0.2.129`).
+
+```bash
+cd web
+npm ci
+npm run core    # build core/ to WebAssembly into src/core
+npm run dev     # the asset page at http://localhost:5173
+```
+
+The checks CI runs are `npm run format:check`, `npm run typecheck`, `npm test`
+and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
+`cargo test` at the root. `npm run assets -- <url>` opens a served page in
+headless Chromium and fails if a texture or model does not load.
+
+The [style frame](prototype/style-frame.html) is a single page: serve the
+repository root with `python3 -m http.server` and open
+`/prototype/style-frame.html`.
 
 ## What it shows about Felix
 
@@ -88,7 +114,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | M | Milestone | What it proves | State |
 |---|---|---|---|
-| 0 | The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame done |
+| 0 | The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame and asset pipeline done |
 | 1 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
 | 2 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
 | 3 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
@@ -96,6 +122,16 @@ second. [docs/design.md](docs/design.md) has the details.
 | 5 | Region watches | Joining costs what you can see, not the whole world | Planned |
 | 6 | Scale and failover | 50 players, broker restarts and failover | Planned |
 | 7 | Self-hosting | Anyone can run it | Planned |
+
+## Repository layout
+
+| Path | What is in it |
+|---|---|
+| `core/` | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table. Built to WebAssembly for the page |
+| `web/` | The browser client: TypeScript and Three.js, built with Vite |
+| `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence |
+| `prototype/` | The style frame, the look the client is built to match |
+| `docs/` | Design and art direction |
 
 ## Documentation
 

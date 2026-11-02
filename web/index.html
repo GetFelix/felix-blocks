@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Felix Blocks assets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600&family=JetBrains+Mono:wght@500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --panel: rgba(12, 20, 28, 0.62);
+        --text: #e8eef3;
+        --muted: #93a3b1;
+        --cyan: hsl(192, 90%, 46%);
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #0a1018;
+        color: var(--text);
+        font:
+          500 14px Inter,
+          system-ui,
+          sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      h2 {
+        margin: 28px 0 10px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      #tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 10px;
+      }
+      figure {
+        margin: 0;
+        padding: 8px;
+        background: var(--panel);
+        border-radius: 8px;
+      }
+      figure img {
+        display: block;
+        width: 96px;
+        height: 96px;
+        margin: 0 auto 6px;
+        image-rendering: pixelated;
+      }
+      figcaption {
+        font:
+          500 11px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      #characters li,
+      #status {
+        font:
+          500 12px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      #status.ok {
+        color: var(--cyan);
+      }
+      #status.fail {
+        color: #ff7a59;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Felix Blocks assets</h1>
+    <p id="status">loading</p>
+    <h2>Tiles</h2>
+    <div id="tiles"></div>
+    <h2>Characters</h2>
+    <ul id="characters"></ul>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

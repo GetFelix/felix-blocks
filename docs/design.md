@@ -271,8 +271,9 @@ Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 | [Survival Kit](https://kenney.nl/assets/survival-kit) (80 assets) | Props: tools, tents, crates | Held items, decoration |
 
 The style frame uses the Voxel Pack and Blocky Characters from
-`prototype/assets/`; [docs/art.md](art.md) has the palette and the restyling.
-Moving them into the client and building the atlas there is M0 work.
+`web/assets/`, which the client loads the same way. [docs/art.md](art.md) has
+the palette and the restyling. Building the atlas in the client is the next M0
+step.
 
 ## Build order
 

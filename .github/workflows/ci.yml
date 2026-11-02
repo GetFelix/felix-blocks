@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.129
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # core/ in WebAssembly, which the tests and the type check import.
+      - run: npm run core
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # Every tile and character loads in headless Chromium, and none on disk is left unloaded.
+      - name: The assets load
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
+          up=0
+          for _ in $(seq 1 30); do curl -sf "http://127.0.0.1:4173/" >/dev/null && up=1 && break; sleep 1; done
+          [[ $up -eq 1 ]] || { echo "nothing is serving on port 4173" >&2; exit 1; }
+          npm run assets -- http://127.0.0.1:4173/
+      # Serve it with `python3 -m http.server` from the download.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+  rust-fmt:
+    name: rust fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - run: cargo fmt --all --check
+
+  rust-clippy:
+    name: rust clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo clippy -p felix-blocks-core --lib --target wasm32-unknown-unknown --locked -- -D warnings
+
+  rust-test:
+    name: rust test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --locked
+
+  # The one check main requires, so a job added later is covered without changing the ruleset.
+  ci-ok:
+    name: CI ok
+    if: always()
+    needs: [web, rust-fmt, rust-clippy, rust-test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "false" ]]
