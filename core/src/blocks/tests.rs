@@ -98,3 +98,22 @@ fn names_need_no_json_escaping() {
         }
     }
 }
+
+#[test]
+fn the_named_ids_point_at_their_blocks() {
+    for (id, name) in [
+        (AIR, "Air"),
+        (GRASS, "Grass"),
+        (DIRT, "Dirt"),
+        (STONE, "Stone"),
+        (SAND, "Sand"),
+        (WATER, "Water"),
+        (OAK_LOG, "Oak log"),
+        (LEAVES, "Leaves"),
+        (GRAVEL, "Gravel"),
+        (COAL_ORE, "Coal ore"),
+        (IRON_ORE, "Iron ore"),
+    ] {
+        assert_eq!(BLOCKS[id as usize].name, name);
+    }
+}

@@ -44,6 +44,18 @@ const fn block(id: u8, name: &'static str, tiles: [&'static str; 3], pass: Pass)
     }
 }
 
+pub const AIR: u8 = 0;
+pub const GRASS: u8 = 1;
+pub const DIRT: u8 = 2;
+pub const STONE: u8 = 3;
+pub const SAND: u8 = 4;
+pub const WATER: u8 = 5;
+pub const OAK_LOG: u8 = 6;
+pub const LEAVES: u8 = 7;
+pub const GRAVEL: u8 = 11;
+pub const COAL_ORE: u8 = 12;
+pub const IRON_ORE: u8 = 13;
+
 /// Every block, indexed by id. Id 0 is air and has no faces.
 pub const BLOCKS: [Block; 16] = [
     block(0, "Air", ["", "", ""], Pass::Opaque),
