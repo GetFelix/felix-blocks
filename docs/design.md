@@ -253,6 +253,8 @@ block whatever it sends. Presence and chat are open to both.
 
 - **Three.js**, plain TypeScript, no UI framework, built with Vite.
 - **Greedy meshing per chunk** in `core`, run in a Web Worker so meshing never blocks a frame. Faces between two solid blocks are culled; coplanar faces of the same block merge into quads. Per-vertex ambient occlusion gives the blocky look its depth.
+
+  The mesher takes a chunk plus one cell of each of its 26 neighbours, so it can hide faces and shade corners across a chunk edge without knowing about other chunks. A neighbour that is not loaded shows as "unloaded": a face looking into it is not drawn, and it does not shade. It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the shader repeats the tile across it.
 - **One texture atlas** built at load time from the block textures, with nearest-neighbour filtering and mipmaps padded so edges do not bleed.
 - **Transparent blocks** (water, glass, leaves) in a second mesh per chunk, drawn after the opaque pass.
 - **The look**: bright daylight, soft fog to the view distance, a sky gradient, and the Felix brand in the UI: cyan `hsl(192, 90%, 46%)` for the cursor outline, selection and accents, Inter for text and JetBrains Mono for coordinates and numbers.
