@@ -43,8 +43,8 @@ npm run dev     # the asset page at http://localhost:5173, then /atlas.html and 
 ```
 
 The checks CI runs are `npm run format:check`, `npm run typecheck`, `npm test`
-and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
-`cargo test` at the root. `npm run assets -- <url>` opens a served page in
+and `npm run build` in `web/`, `cargo fmt --check`, `cargo clippy` and
+`cargo test` at the root, and the Felix stack below. `npm run assets -- <url>` opens a served page in
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
 distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
@@ -52,6 +52,30 @@ world, and fails if the page does any of the meshing itself, if a merged quad
 does not look like the separate blocks it replaces, or if the view distance does
 not step down under 40 ms frames. It does not show the controller following the
 frame time in both directions; the unit tests cover that.
+
+### The Felix stack
+
+`dev/up.sh` starts Felix on your machine: a broker, the control plane, a
+stand-in sign-in provider and [felix-gateway](https://github.com/GetFelix/felix-gateway)
+0.8.0, the first gateway that relays conditional cache writes. It needs Docker
+or Podman with Compose v2 (or podman-compose 1.4 or later), Node 22 for the
+check, and these ports free on localhost: 5000/udp, 8080, 8443, 8787 and 9400.
+It also creates one world, `demo`, that the players `ana` and `ben` may join.
+The world starts empty: its info cache holds nothing until `blocks-tool` writes
+it.
+
+```bash
+dev/up.sh                  # start the stack and wait until the gateway serves
+node dev/check-join.mjs    # sign in, join the demo world, write a chunk key conditionally
+dev/down.sh                # stop it and delete its data
+```
+
+The browser connects to `ws://127.0.0.1:8787/ws`, and signs in at
+`http://127.0.0.1:9400`, which lets anyone pick a name. The stand-in provider
+is for development only. The control plane keeps its state in memory, so
+`dev/up.sh` always starts from nothing. `dev/scope.toml` is the list of
+resources a session in a world can reach, and `dev/seed.mjs` creates them; real
+worlds are made with `blocks-tool`, once it exists.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open
@@ -101,10 +125,10 @@ change at once:
 | Builders and visitors                       | RBAC on the world's cache                                  |
 | Browsers                                    | [felix-gateway](https://github.com/GetFelix/felix-gateway) |
 
-Some of these are not yet reachable through the gateway. The biggest is
-conditional writes, which multiplayer needs
-([felix-gateway#31](https://github.com/GetFelix/felix-gateway/issues/31)). The
-design lists the rest under "Felix gaps", and each one has an issue labelled
+Some of these are not yet reachable through the gateway, such as watching one
+region of a cache and resuming a watch. Conditional writes are, since
+felix-gateway 0.8.0. The design lists the gaps under "Felix gaps", and each one
+has an issue labelled
 [`felix-gap`](https://github.com/GetFelix/felix-blocks/labels/felix-gap).
 
 ## How it works
@@ -127,7 +151,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | -------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The look, locked           | It looks good, day and night, before Felix is involved                           | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
 | A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | Planned                                                                                                                                              |
-| Multiplayer                | Two players in one chunk never overwrite each other                              | Planned, needs conditional writes in the gateway                                                                                                     |
+| Multiplayer                | Two players in one chunk never overwrite each other                              | Planned. The gateway relays conditional writes since 0.8.0                                                                                           |
 | A world that lasts         | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned                                                                                                                                              |
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |
 | Region watches             | Joining costs what you can see, not the whole world                              | Planned                                                                                                                                              |
@@ -139,6 +163,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Path          | What is in it                                                                                                                                 |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `core/`       | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table and the chunk mesher. Built to WebAssembly for the page |
+| `dev/`        | The Felix stack for development: compose file, sign-in stand-in, seed, and the check that joins through the gateway                           |
 | `web/`        | The browser client: TypeScript and Three.js, built with Vite                                                                                  |
 | `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence                                                                             |
 | `prototype/`  | The style frame, the look the client is built to match                                                                                        |

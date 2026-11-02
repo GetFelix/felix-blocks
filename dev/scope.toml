@@ -1,0 +1,37 @@
+# What the gateway lets a browser session reach in one world. dev/seed.mjs creates these resources for the world
+# `demo`. A world is the scope: a session's token reaches the resources of the world it joined and nothing else.
+
+[scope]
+field = "world"
+
+# One key per edited chunk. One shard, because the gateway's watch reads a single shard.
+[[scope.caches]]
+alias = "chunks"
+name = "blocks.chunks.{scope}"
+actions = ["read", "write", "watch"]
+
+# The seed, generator version, size and spawn point. Players read it and never write it.
+[[scope.caches]]
+alias = "info"
+name = "blocks.info.{scope}"
+actions = ["read"]
+
+# One entry per player, gone 30 seconds after it was last written.
+[[scope.caches]]
+alias = "online"
+name = "blocks.online.{scope}"
+actions = ["read", "write", "watch"]
+ttl_s = 30
+
+# Positions, in memory only and at most once.
+[[scope.streams]]
+alias = "presence"
+name = "blocks.presence.{scope}"
+actions = ["publish", "subscribe"]
+
+# Short messages, each stamped with the verified sender.
+[[scope.streams]]
+alias = "chat"
+name = "blocks.chat.{scope}"
+actions = ["publish", "subscribe"]
+stamp_sender = true

@@ -4,3 +4,4 @@ dist/
 .DS_Store
 /web/src/core/
 /web/frames/
+/dev/state/
