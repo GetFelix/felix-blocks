@@ -17,12 +17,19 @@ export interface EditSyncOptions {
   onChanged?: (chunks: ChunkPos[]) => void;
   /** Called when a write fails for a reason other than a refused condition. The edits stay pending and are tried again. */
   onError?: (error: unknown) => void;
+  /**
+   * Called when a stored value cannot be read as a chunk and the player has no unsaved edits in it, with its key. The
+   * chunk keeps the generated blocks. Otherwise, and without this, the error goes to `onError`.
+   */
+  onBadValue?: (key: string, error: unknown) => void;
 }
 
 /** Writes tried per chunk and flush before the rest waits for the next one. */
 const MAX_ATTEMPTS = 5;
 /** How long a chunk whose write failed is left alone, in milliseconds. */
 const BACKOFF_MS = 1000;
+/** Chunks one flush starts, so a big save does not burst far past the gateway's write rate. */
+const PER_FLUSH = 20;
 
 interface Chunk {
   pos: ChunkPos;
@@ -45,6 +52,8 @@ export class EditSync {
   private readonly chunks = new Map<string, Chunk>();
   private readonly cache: string;
   private timer: ReturnType<typeof setInterval> | undefined;
+  /** No flush starts a write before this time: the gateway said the session writes too fast. */
+  private holdUntil = 0;
 
   constructor(
     private readonly world: EditableWorld,
@@ -85,10 +94,11 @@ export class EditSync {
   /** Reads every chunk the watch reported and writes every chunk with pending changes. Resolves when each is done. */
   async flush(): Promise<void> {
     const now = this.now();
+    if (now < this.holdUntil) return;
     const due = [...this.chunks.values()].filter(
       (chunk) => !chunk.busy && chunk.retryAt <= now && (chunk.stale || chunk.pending.size > 0),
     );
-    await Promise.all(due.map((chunk) => this.step(chunk)));
+    await Promise.all(due.slice(0, PER_FLUSH).map((chunk) => this.step(chunk)));
   }
 
   /**
@@ -149,6 +159,13 @@ export class EditSync {
       if (chunk.pending.size > 0) await this.write(chunk);
     } catch (error) {
       if (reading) chunk.stale = true;
+      const wait = rateLimitWait(error);
+      if (wait !== null) {
+        // Refused before it reached Felix, so nothing is wrong with the chunk. The edits wait for the gateway's bucket.
+        this.holdUntil = Math.max(this.holdUntil, this.now() + wait);
+        chunk.maybe = null;
+        return;
+      }
       this.backoff(chunk);
       this.options.onError?.(error);
     } finally {
@@ -217,7 +234,9 @@ export class EditSync {
       next = value ? decodeValue(value, generated.version, generated.chunk(cx, cy, cz)!) : generated.chunk(cx, cy, cz)!;
     } catch (error) {
       chunk.version = null;
-      this.options.onError?.(error);
+      // Only a chunk with unsaved edits is a failed save; otherwise the player just sees the generated blocks.
+      if (chunk.pending.size === 0 && this.options.onBadValue) this.options.onBadValue(chunk.key, error);
+      else this.options.onError?.(error);
       return false;
     }
     const before = chunk.confirmed;
@@ -237,6 +256,13 @@ export class EditSync {
     }
     return true;
   }
+}
+
+/** How long the gateway wants the session to wait, if the error is its `rate_limited` refusal. */
+function rateLimitWait(error: unknown): number | null {
+  const refused = error as { code?: unknown; retryAfterMs?: unknown } | null;
+  if (refused?.code !== 'rate_limited') return null;
+  return typeof refused.retryAfterMs === 'number' ? Math.max(refused.retryAfterMs, 250) : BACKOFF_MS;
 }
 
 function chunkAt(key: string): ChunkPos | null {

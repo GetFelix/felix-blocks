@@ -16,7 +16,8 @@
     "atlas": "node scripts/check-atlas.mjs",
     "chunks": "node scripts/check-chunks.mjs",
     "play": "node scripts/check-play.mjs",
-    "edits": "node scripts/check-edits.mjs"
+    "edits": "node scripts/check-edits.mjs",
+    "load": "node scripts/check-load.mjs"
   },
   "dependencies": {
     "felix-gateway-client": "https://github.com/GetFelix/felix-gateway/releases/download/v0.8.0/felix-gateway-client-0.8.0.tgz",
