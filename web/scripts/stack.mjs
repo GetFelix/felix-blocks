@@ -31,6 +31,8 @@ export async function openAs(browser, url, world, user, errors) {
   where.searchParams.set('gateway', GATEWAY);
   where.searchParams.set('world', world);
   where.searchParams.set('token', await idToken(user));
+  // A short view keeps two software-rendered pages from starving each other on a small runner.
+  where.searchParams.set('tier', '4');
   await page.goto(where.href, { waitUntil: 'load', timeout: 120_000 });
   await page
     .waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 300_000 })

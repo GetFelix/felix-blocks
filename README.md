@@ -28,6 +28,7 @@ everyone what changed.
 
 You can walk around a generated world and change it. The play page
 (`/play.html`) drops you into a world made from a seed (`?seed=7` by default) and starts you on dry ground near its middle.
+The view distance follows the frame rate; `?tier=4` holds it at 4 chunks, which the browser checks use.
 Click it to look around with the mouse, walk with WASD or the arrows, jump with
 space, sprint with shift, and fly with F or a double tap of space (space rises,
 shift sinks, and landing ends the flight). You walk on the generated terrain,
