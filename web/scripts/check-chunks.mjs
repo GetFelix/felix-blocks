@@ -1,8 +1,10 @@
-// Draws meshed chunks in headless Chromium and checks two things.
+// Draws meshed chunks in headless Chromium and checks three things.
 // 1. Meshing stays off the page: a made-up world is meshed in workers while the camera walks across chunk boundaries.
 //    The page counts the meshing it does on its own thread, which must be none, and its own work per chunk stays small.
 //    The same walk with meshing on the page is the comparison: it must count every chunk, so the count is known to work.
-// 2. Merged quads (a floor, and a wall whose quads are not square) show the same pixels as the separate blocks they
+// 2. The view distance follows the frame time: with 40 ms of extra work in every frame it starts at 8 chunks and steps
+//    down, and the debug panel says so.
+// 3. Merged quads (a floor, and a wall whose quads are not square) show the same pixels as the separate blocks they
 //    replace, and the check can see a seam: wrapping the tile coordinate before choosing the mip level must fail it.
 // Usage: node scripts/check-chunks.mjs <chunks page url> [screenshot dir]. The pages must already be served.
 import { mkdirSync } from 'node:fs';
@@ -79,6 +81,16 @@ if (inline.result.onPage.calls < inline.result.chunks)
 if (worker.result.applyMs.p95 > MAX_APPLY_P95_MS)
   fail(`the page spent ${worker.result.applyMs.p95.toFixed(1)} ms on a chunk's result, over ${MAX_APPLY_P95_MS}`);
 if (worker.result.wanted !== inline.result.wanted) fail('the worker and the page run ended in different places');
+
+const adapt = await load('chunks.html?adapt=1&slow=40', '__chunksResult', 'chunks-adaptive');
+const { tiers, panel } = adapt.result;
+console.log(`adaptive, 40 ms frames: view distance ${tiers.join(' to ')} chunks`);
+console.log(`  panel: ${panel.replaceAll('\n', ' | ')}`);
+for (const e of [...adapt.result.failures, ...adapt.errors]) fail(`adaptive: ${e}`);
+if (tiers[0] !== 8) fail(`the view distance started at ${tiers[0]}, not 8`);
+if (tiers.length < 2 || tiers.at(-1) >= 8) fail('slow frames did not bring the view distance down');
+if (!panel.includes(`view ${tiers.at(-1)} chunks`) || !panel.includes('slow'))
+  fail('the debug panel does not show the tier change');
 
 const repeat = await load('repeat.html', '__repeatResult', 'repeat', { width: 700, height: 520 });
 const seams = await load('repeat.html?gradients=0', '__repeatResult', 'repeat-wrapped', { width: 700, height: 520 });
