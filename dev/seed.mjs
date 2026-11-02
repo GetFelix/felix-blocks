@@ -1,7 +1,7 @@
 // Seeds a Felix for the gateway and the web app: bootstrap a tenant that trusts idp.mjs, create the resources of a
-// world called `demo` (the ones in scope.toml), let two players into it, and write the broker's token to the state
-// directory. Safe to run again: existing objects are kept. Real worlds are made by blocks-tool; this one only gives
-// the stack something to join.
+// world called `demo` (the ones in scope.toml), let two players into it, and write the broker's token and the
+// administrator's tokens to the state directory. Safe to run again: existing objects are kept. Real worlds are made
+// by blocks-tool; this one only gives the stack something to join.
 import { createHash } from 'node:crypto';
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 
@@ -69,6 +69,9 @@ await request('POST', `${BOOTSTRAP}/internal/bootstrap/tenants/${TENANT}/initial
     policies: [
       { subject: 'role:admin', object: object('stream', '*'), action: 'stream.manage' },
       { subject: 'role:admin', object: object('cache', '*'), action: 'cache.manage' },
+      // blocks-tool writes a new world's info.
+      { subject: 'role:admin', object: object('cache', '*'), action: 'cache.read' },
+      { subject: 'role:admin', object: object('cache', '*'), action: 'cache.write' },
       // The admin finalizes the fleet features the broker's cluster needs.
       { subject: 'role:admin', object: 'cluster:*', action: 'node.manage' },
       { subject: 'role:broker', object: 'cluster:*', action: 'node.view' },
@@ -153,6 +156,12 @@ await chmod(STATE, 0o777).catch(() => {});
 const broker = await exchange('blocks-broker', { audience: 'felix-controlplane' });
 await writeFile(`${STATE}/node.token`, broker, { mode: 0o644 });
 console.log(`wrote node.token to ${STATE}`);
+
+// The administrator's tokens for blocks-tool (0644: the seed runs as another user in a container and the host reads them): one for the control plane, one for the broker's caches.
+await writeFile(`${STATE}/admin.token`, admin, { mode: 0o644 });
+const adminData = await exchange('blocks-admin', { requested: ['cache.read', 'cache.write'] });
+await writeFile(`${STATE}/admin-data.token`, adminData, { mode: 0o644 });
+console.log(`wrote admin.token and admin-data.token to ${STATE}`);
 
 // up.sh waits for this before it calls the stack ready.
 await writeFile(`${STATE}/seeded`, '');
