@@ -46,7 +46,10 @@ const status = document.getElementById('status')!;
 const hint = document.getElementById('hint')!;
 const hotbar = document.getElementById('hotbar')!;
 
-/** Joins the world through the gateway with an ID token, and watches its chunks. */
+/**
+ * Joins the world through the gateway with an ID token, and watches its chunks. The entries on join are loaded as they
+ * are; a later change carries no version, so it only tells the sync to read that chunk.
+ */
 async function join(sync: EditSync, gateway: string, world: string, token: string) {
   const client = await GatewayClient.connect(gateway, { token, world }, ['cache_versions']);
   client.onCacheEntries = (cache, entries) => {
@@ -54,7 +57,7 @@ async function join(sync: EditSync, gateway: string, world: string, token: strin
     for (const entry of entries) sync.ingest(entry.key, entry.payload);
   };
   client.onCacheChange = (cache, entry) => {
-    if (cache === 'chunks') sync.ingest(entry.key, entry.payload);
+    if (cache === 'chunks') sync.changed(entry.key);
   };
   return client;
 }
@@ -97,6 +100,7 @@ async function run() {
   const palette = table.blocks.filter((b) => b.pass !== 'water').slice(0, SLOTS);
   const targets = targetTable(table.blocks);
   let client: GatewayClient | null = null;
+  let closed = false;
   const sync = new EditSync(
     world,
     {
@@ -107,6 +111,8 @@ async function run() {
       onChanged: (chunks) => view.invalidate(chunks),
       onError: (e) => {
         console.error('saving to Felix failed', e);
+        // The disconnected message says more than the write errors that follow it.
+        if (closed) return;
         status.textContent = `not saved: ${e instanceof Error ? e.message : e}`;
         status.className = 'fail';
       },
@@ -119,7 +125,11 @@ async function run() {
     client = await join(sync, gateway, worldName, token);
     client.cacheWatch('chunks');
     client.onClose = () => {
-      status.textContent = 'disconnected: reload to keep building';
+      closed = true;
+      sync.stop();
+      status.textContent = sync.dirty
+        ? 'disconnected: reload to keep building (edits not saved yet are lost)'
+        : 'disconnected: reload to keep building';
       status.className = 'fail';
     };
     sync.start();
@@ -233,6 +243,8 @@ async function run() {
 
 run()
   .then(() => {
+    // A disconnect or a failed write during loading stays on screen.
+    if (status.className === 'fail') return;
     status.textContent = `world ${seed}`;
     status.className = 'ok';
   })

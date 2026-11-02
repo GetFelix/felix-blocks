@@ -1,7 +1,8 @@
 // Edits go to Felix in batches. A player's block is drawn at once as a pending change; every flush writes each changed
 // chunk's delta with a conditional put at the version the client last saw. A refused write means someone else wrote the
-// chunk first: take their value, lay the pending changes over it and write again. See "Editing a chunk" in
-// docs/design.md.
+// chunk first: take their value, lay the pending changes over it and write again. The watch's values carry no version,
+// so a watch change only marks the chunk to be read with its version; values are ordered by version, never by arrival.
+// See "Editing a chunk" in docs/design.md.
 import type { Gateway } from 'felix-gateway-client';
 import { chunkOf, decodeValue, encodeValue, keyOf } from './chunk-store';
 import { cellIndex, type ChunkPos, type EditableWorld } from './editable-world';
@@ -32,11 +33,11 @@ interface Chunk {
   version: number | 'absent' | null;
   /** The cells the player changed that Felix does not hold yet. */
   pending: Map<number, number>;
-  /** The bytes this client last wrote, to tell its own watch echo from somebody else's write. */
-  written: Uint8Array | null;
+  /** The cells of a write that failed without an answer, so it may have applied. Reading them back is not a conflict. */
+  maybe: Map<number, number> | null;
+  /** The watch reported a change, so the key must be read with its version. */
+  stale: boolean;
   busy: boolean;
-  /** A value the watch delivered while a write was in flight (undefined: none; null: the key was deleted). */
-  arrived: Uint8Array | null | undefined;
   retryAt: number;
 }
 
@@ -81,28 +82,33 @@ export class EditSync {
     this.timer = undefined;
   }
 
-  /** Writes every chunk with pending changes. Resolves when each has been written or has failed. */
+  /** Reads every chunk the watch reported and writes every chunk with pending changes. Resolves when each is done. */
   async flush(): Promise<void> {
+    const now = this.now();
     const due = [...this.chunks.values()].filter(
-      (chunk) => chunk.pending.size > 0 && !chunk.busy && chunk.retryAt <= this.now(),
+      (chunk) => !chunk.busy && chunk.retryAt <= now && (chunk.stale || chunk.pending.size > 0),
     );
-    await Promise.all(due.map((chunk) => this.write(chunk)));
+    await Promise.all(due.map((chunk) => this.step(chunk)));
   }
 
   /**
-   * Takes a value Felix holds for a chunk key (from a watch or a read): the chunk becomes that value with the pending
-   * changes on top. `null` means the key was deleted. A value that cannot be read is skipped.
+   * Takes a value from the cache's entries delivered on join: the chunk becomes that value with the pending changes on
+   * top. `null` means the key has no value. A chunk the client already read is only marked to be read again, because
+   * the value has no version to order it against what the client holds.
    */
   ingest(key: string, value: Uint8Array | null): void {
     const pos = chunkAt(key);
     if (!pos || !this.world.generated.chunk(...pos)) return;
     const chunk = this.state(...pos);
-    if (chunk.busy) {
-      chunk.arrived = value;
-      return;
-    }
-    if (value && chunk.written && sameBytes(value, chunk.written)) return;
-    this.take(chunk, value, null);
+    if (chunk.busy || chunk.version !== null) chunk.stale = true;
+    else this.take(chunk, value, null);
+  }
+
+  /** Marks a chunk the watch reported as changed, so the next flush reads it with its version. */
+  changed(key: string): void {
+    const pos = chunkAt(key);
+    if (!pos || !this.world.generated.chunk(...pos)) return;
+    this.state(...pos).stale = true;
   }
 
   private state(cx: number, cy: number, cz: number): Chunk {
@@ -118,9 +124,9 @@ export class EditSync {
         // Nothing is known about the key until it is read; a chunk nobody edited has none.
         version: null,
         pending: new Map(),
-        written: null,
+        maybe: null,
+        stale: false,
         busy: false,
-        arrived: undefined,
         retryAt: 0,
       };
       this.chunks.set(key, chunk);
@@ -128,64 +134,100 @@ export class EditSync {
     return chunk;
   }
 
-  private async write(chunk: Chunk): Promise<void> {
+  /** Reads the chunk if it is stale, then writes its pending changes. Only one step runs per chunk at a time. */
+  private async step(chunk: Chunk): Promise<void> {
     chunk.busy = true;
+    let reading = false;
     try {
-      for (let attempt = 0; attempt < MAX_ATTEMPTS && chunk.pending.size > 0; attempt++) {
-        if (chunk.version === null) {
-          const entry = await this.gateway.cacheGetVersioned(this.cache, chunk.key);
-          this.take(chunk, entry?.payload ?? null, entry ? entry.version : 'absent');
-        }
-        const sent = new Map(chunk.pending);
-        const desired = chunk.confirmed.slice();
-        for (const [cell, id] of sent) desired[cell] = id;
-        const generated = this.world.generated;
-        const value = encodeValue(generated.version, generated.chunk(...chunk.pos)!, desired);
-        const condition = chunk.version === 'absent' ? 'absent' : { version: chunk.version! };
-        const result = await this.gateway.cachePutIf(this.cache, chunk.key, value, condition);
-        if (result.applied) {
-          chunk.confirmed = desired;
-          chunk.version = result.version;
-          chunk.written = value;
-          for (const [cell, id] of sent) if (chunk.pending.get(cell) === id) chunk.pending.delete(cell);
-        } else {
-          // Somebody wrote first. Read their value, and rebase on it at the top of the loop.
-          chunk.version = null;
-        }
+      if (chunk.stale) {
+        // Cleared first, so a change reported during the read marks the chunk again.
+        chunk.stale = false;
+        reading = true;
+        if (!(await this.refresh(chunk))) return this.backoff(chunk);
+        reading = false;
       }
+      if (chunk.pending.size > 0) await this.write(chunk);
     } catch (error) {
-      chunk.version = null;
-      chunk.retryAt = this.now() + BACKOFF_MS;
+      if (reading) chunk.stale = true;
+      this.backoff(chunk);
       this.options.onError?.(error);
     } finally {
       chunk.busy = false;
     }
-    if (chunk.arrived !== undefined) {
-      const arrived = chunk.arrived;
-      chunk.arrived = undefined;
-      this.ingest(chunk.key, arrived);
+  }
+
+  /** Takes the stored value if its version is not the one the client holds. False if it could not be read. */
+  private async refresh(chunk: Chunk): Promise<boolean> {
+    const entry = await this.gateway.cacheGetVersioned(this.cache, chunk.key);
+    // An equal version is the client's own write coming back.
+    if (entry) return entry.version === chunk.version || this.take(chunk, entry.payload, entry.version);
+    return chunk.version === 'absent' || this.take(chunk, null, 'absent');
+  }
+
+  private async write(chunk: Chunk): Promise<void> {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS && chunk.pending.size > 0; attempt++) {
+      if (chunk.version === null) {
+        const entry = await this.gateway.cacheGetVersioned(this.cache, chunk.key);
+        if (!this.take(chunk, entry?.payload ?? null, entry ? entry.version : 'absent')) return this.backoff(chunk);
+        if (chunk.pending.size === 0) return;
+      }
+      const version = chunk.version;
+      // Never write without a version: the put would not be conditional on what the client rebased on.
+      if (version === null) return this.backoff(chunk);
+      const sent = new Map(chunk.pending);
+      const desired = chunk.confirmed.slice();
+      for (const [cell, id] of sent) desired[cell] = id;
+      const generated = this.world.generated;
+      const value = encodeValue(generated.version, generated.chunk(...chunk.pos)!, desired);
+      // Kept if the put throws, since it may still have applied.
+      chunk.maybe = sent;
+      const result = await this.gateway.cachePutIf(
+        this.cache,
+        chunk.key,
+        value,
+        version === 'absent' ? 'absent' : { version },
+      );
+      chunk.maybe = null;
+      if (result.applied) {
+        chunk.confirmed = desired;
+        chunk.version = result.version;
+        for (const [cell, id] of sent) if (chunk.pending.get(cell) === id) chunk.pending.delete(cell);
+      } else {
+        // Somebody wrote first. Read their value, and rebase on it at the top of the loop.
+        chunk.version = null;
+      }
     }
   }
 
+  private backoff(chunk: Chunk): void {
+    chunk.version = null;
+    chunk.retryAt = this.now() + BACKOFF_MS;
+  }
+
   /**
-   * Makes `value` the chunk's confirmed blocks. A pending change to a cell the new value changed is dropped, so the
-   * other player's block stands; the rest stay on top. The chunk is redrawn if what the player sees changed.
+   * Makes `value` the chunk's confirmed blocks at `version`. A pending change to a cell the new value changed is
+   * dropped, so the other player's block stands; the rest stay on top. The chunk is redrawn if what the player sees
+   * changed. False, with the error reported, if the value cannot be read.
    */
-  private take(chunk: Chunk, value: Uint8Array | null, version: number | 'absent' | null): void {
+  private take(chunk: Chunk, value: Uint8Array | null, version: number | 'absent' | null): boolean {
     const [cx, cy, cz] = chunk.pos;
     const generated = this.world.generated;
     let next: Uint8Array;
     try {
       next = value ? decodeValue(value, generated.version, generated.chunk(cx, cy, cz)!) : generated.chunk(cx, cy, cz)!;
     } catch (error) {
+      chunk.version = null;
       this.options.onError?.(error);
-      return;
+      return false;
     }
     const before = chunk.confirmed;
-    for (const cell of [...chunk.pending.keys()]) if (next[cell] !== before[cell]) chunk.pending.delete(cell);
+    for (const cell of [...chunk.pending.keys()]) {
+      // A cell that holds what our unanswered write sent is our own write read back, not another player's.
+      if (next[cell] !== before[cell] && chunk.maybe?.get(cell) !== next[cell]) chunk.pending.delete(cell);
+    }
+    chunk.maybe = null;
     chunk.confirmed = next;
     chunk.version = version;
-    if (value === null) chunk.written = null;
     const shown = next.slice();
     for (const [cell, id] of chunk.pending) shown[cell] = id;
     const current = this.world.chunk(cx, cy, cz)!;
@@ -193,6 +235,7 @@ export class EditSync {
       this.world.setChunk(cx, cy, cz, shown);
       this.options.onChanged?.(this.world.touched(cx, cy, cz));
     }
+    return true;
   }
 }
 

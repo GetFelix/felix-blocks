@@ -241,9 +241,9 @@ Each edit is a compare-and-set on the chunk's key:
 
 1. The client holds each watched chunk's value and the version it last saw. A key's version is the log offset of the put that wrote it, and it only grows.
 2. The player places a block. The client draws it at once as a pending change and adds it to the chunk's batch.
-3. Every 100 ms, for each chunk with pending changes, it writes the new delta with `cache_put_if` at the version it holds (or absent, for a chunk with no key yet). If it does not hold the version, it reads the key with `cache_get` first. Today's gateway watch carries values without versions (gap 1 below), so a value that arrives by the watch leaves the version unknown, unless it is the bytes this client just wrote.
+3. Every 100 ms, for each chunk with pending changes, it writes the new delta with `cache_put_if` at the version it holds (or absent, for a chunk with no key yet). If it does not hold the version, it reads the key with `cache_get` first. Today's gateway watch carries values without versions (gap 1 below), so a watch change only marks the chunk stale, and the next round reads the key with its version.
 4. Applied: the answer carries the new version. The pending changes become real.
-5. Refused: someone wrote the chunk first. The client reads the key with its version, replays its pending changes on top of that value, and writes again, up to five times in one round before it waits for the next. A change whose cell the other player also changed is dropped in favour of the stored one, and the player sees their block replaced.
+5. Refused: someone wrote the chunk first. The client reads the key with its version, replays its pending changes on top of that value, and writes again, up to five times in one round before it waits for the next. A change whose cell the other player also changed is dropped in favour of the stored one, and the player sees their block replaced. A read that returns the version the client already holds is its own write coming back and changes nothing.
 
 A write that fails for another reason (the connection, a visitor who may not write) leaves the changes pending, and the client tries that chunk again a second later. The code is `web/src/edit-sync.ts`; `web/src/editable-world.ts` holds the blocks the player sees, and `web/src/raycast.ts` finds the block a click targets.
 
@@ -253,8 +253,11 @@ cost is one retry per collision, which at 16³ chunks is rare.
 
 Felix does not retry a conditional write after an indeterminate forward,
 because a retry of a write that applied would be refused by its own version.
-The client treats a refusal whose current version is one it does not yet hold
-as a normal refusal and waits for the watch.
+The client keeps the changes of a write that got no answer, reads the key
+again, and treats those blocks coming back as its own write rather than
+another player's. A watch change only marks the chunk stale and the client
+reads the key with its version, so values are ordered by version, never by
+arrival.
 
 ### Watching the world
 

@@ -46,7 +46,8 @@ echo "http://localhost:5173/play.html?gateway=ws://127.0.0.1:8787/ws&world=demo&
 
 Edits show at once and are written to the world's chunk cache every 100 ms,
 one write per changed chunk. The page also watches the cache, so it shows what
-other players build and what you built before. There is no sign-in page yet,
+other players build and what you built before. The page's `?seed=` must match the world's seed,
+until the page reads the world info on join. There is no sign-in page yet,
 so the token comes from the development provider.
 
 The rest of what runs is the asset page, which loads
