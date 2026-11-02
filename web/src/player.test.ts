@@ -201,3 +201,30 @@ test('a player can walk across generated terrain without falling through or stic
   // It kept moving over the chunk edges it met, instead of catching on one.
   expect(crossed.size).toBeGreaterThan(15);
 });
+
+test('a swimmer can climb out onto a bank level with the water', () => {
+  const pool = {
+    block: (x: number, y: number) => {
+      const [bx, by] = [Math.floor(x), Math.floor(y)];
+      if (bx >= 5) return by < 20 ? STONE : 0;
+      return by < 10 ? STONE : by < 20 ? WATER : 0;
+    },
+  };
+  const p = player(0.5, 12, 0.5);
+  run(p, 20, input({ forward: 1, jump: true, yaw: -Math.PI / 2 }), pool);
+  expect(p.x).toBeGreaterThan(6);
+  expect(p.y).toBeGreaterThanOrEqual(20);
+});
+
+test('a standing player counts as on the ground at any frame rate', () => {
+  for (const fps of [30, 60, 144, 1000]) {
+    const p = player(0.5, 10, 0.5);
+    run(p, 1, input(), floor(), fps);
+    let grounded = 0;
+    for (let n = 0; n < fps; n++) {
+      p.update(1 / fps, input(), floor());
+      if (p.onGround) grounded++;
+    }
+    expect(grounded, `${fps} fps`).toBe(fps);
+  }
+});

@@ -104,18 +104,23 @@ export class Player {
     if (this.flying) {
       this.vy = ((input.jump ? 1 : 0) - (input.down ? 1 : 0)) * FLY;
     } else if (swimming) {
-      this.vy = input.jump ? SWIM_UP : Math.max(this.vy - SWIM_GRAVITY * dt, -SWIM_SINK);
+      // Pushing off the bed, or with the head at the surface, is a full jump, so a bank level with the water can be
+      // climbed out onto.
+      const out = this.onGround || !this.waterAt(blocks, this.y + 1);
+      const rise = input.jump ? (out ? JUMP : SWIM_UP) : -SWIM_SINK;
+      this.vy = Math.max(this.vy - SWIM_GRAVITY * dt, rise);
     } else {
       if (input.jump && this.onGround) this.vy = JUMP;
       this.vy = Math.max(this.vy - GRAVITY * dt, -TERMINAL);
     }
 
-    this.onGround = false;
     // Sideways first, so a wall stops that axis without stopping the fall.
     this.move(0, this.vx * dt, blocks);
     this.move(2, this.vz * dt, blocks);
     this.move(1, this.vy * dt, blocks);
-    if (this.flying && this.onGround) this.flying = false;
+    // Looked up, not taken from the last collision: a standing player falls too little in a short step to touch.
+    this.onGround = this.supported(blocks);
+    if (this.flying && input.down && this.onGround) this.flying = false;
   }
 
   /** Moves along one axis (0 x, 1 y, 2 z), in short hops, stopping at the face of whatever blocks it. */
@@ -143,7 +148,6 @@ export class Player {
           if (axis === 1) {
             if (delta < 0) {
               this.y = cell + 1 + EPS;
-              this.onGround = true;
             } else {
               this.y = cell - HEIGHT - EPS;
             }
@@ -157,6 +161,15 @@ export class Player {
         }
     [this.x, this.y, this.z] = pos as [number, number, number];
     return true;
+  }
+
+  /** Whether a solid block is just under the feet. */
+  private supported(blocks: Blocks): boolean {
+    const by = Math.floor(this.y - 2 * EPS);
+    for (let z = Math.floor(this.z - HALF_WIDTH); z < Math.ceil(this.z + HALF_WIDTH); z++)
+      for (let x = Math.floor(this.x - HALF_WIDTH); x < Math.ceil(this.x + HALF_WIDTH); x++)
+        if (this.solid[blocks.block(x, by, z)]) return true;
+    return false;
   }
 
   private waterAt(blocks: Blocks, y: number): boolean {

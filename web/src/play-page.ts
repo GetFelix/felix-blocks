@@ -89,6 +89,8 @@ async function run() {
   const frame = (now: number) => {
     const delta = now - last;
     last = now;
+    // Next frame first, so a throw below shows in the console without freezing the picture.
+    requestAnimationFrame(frame);
     frames.count++;
     if (controls.takeFlyToggle()) player.toggleFlying();
     player.update(Math.min(delta / 1000, 0.1), controls.sample(), blocks);
@@ -110,7 +112,6 @@ async function run() {
       changes: distance.changes,
     });
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   };
 
   // Load what is around the start before the first frame, so the player does not fall through a blank world.
@@ -130,6 +131,7 @@ run()
     status.className = 'ok';
   })
   .catch((e) => {
+    console.error(e);
     status.textContent = String(e);
     status.className = 'fail';
   })

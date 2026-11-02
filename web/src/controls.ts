@@ -11,7 +11,9 @@ export class Controls {
   yaw = 0;
   pitch = 0;
   /** Set when the player asks to start or stop flying; read it with `takeFlyToggle`. */
-  private fly = false;
+  private fly = 0;
+  /** A jump pressed and released between two samples still counts. */
+  private jumped = false;
   private readonly held = new Set<string>();
   private lastSpace = -Infinity;
   private readonly off: (() => void)[] = [];
@@ -25,7 +27,10 @@ export class Controls {
     this.listen(keys, 'keydown', (e) => this.key(e as KeyboardEvent, true));
     this.listen(keys, 'keyup', (e) => this.key(e as KeyboardEvent, false));
     // Keys released while the page was not looking never send keyup.
-    this.listen(keys, 'blur', () => this.held.clear());
+    this.listen(keys, 'blur', () => {
+      this.held.clear();
+      this.lastSpace = -Infinity;
+    });
     if (canvas) {
       this.listen(canvas, 'click', () => void canvas.requestPointerLock?.());
       this.listen(canvas.ownerDocument, 'mousemove', (e) => {
@@ -38,21 +43,23 @@ export class Controls {
   sample(): Input {
     const axis = (plus: string[], minus: string[]) =>
       (plus.some((c) => this.held.has(c)) ? 1 : 0) - (minus.some((c) => this.held.has(c)) ? 1 : 0);
+    const jump = this.held.has('Space') || this.jumped;
+    this.jumped = false;
     return {
       forward: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']),
       right: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']),
-      jump: this.held.has('Space'),
+      jump,
       down: this.held.has('ShiftLeft') || this.held.has('ShiftRight'),
       sprint: this.held.has('ControlLeft') || this.held.has('ShiftLeft'),
       yaw: this.yaw,
     };
   }
 
-  /** True once per request to toggle flying. */
+  /** True if flying was asked to toggle an odd number of times since the last call. */
   takeFlyToggle(): boolean {
-    const asked = this.fly;
-    this.fly = false;
-    return asked;
+    const odd = this.fly % 2 === 1;
+    this.fly = 0;
+    return odd;
   }
 
   /** Turns the view by a mouse movement, in pixels. */
@@ -68,11 +75,13 @@ export class Controls {
   private key(e: KeyboardEvent, down: boolean): void {
     if (down) {
       if (!this.held.has(e.code)) {
-        if (e.code === 'KeyF') this.fly = true;
+        // Ctrl+F and Cmd+F are the browser's find.
+        if (e.code === 'KeyF' && !(e.ctrlKey || e.metaKey || e.altKey)) this.fly++;
         if (e.code === 'Space') {
+          this.jumped = true;
           const at = this.now();
           const twice = at - this.lastSpace < DOUBLE_TAP_MS;
-          this.fly ||= twice;
+          if (twice) this.fly++;
           this.lastSpace = twice ? -Infinity : at;
         }
       }

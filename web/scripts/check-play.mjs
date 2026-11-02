@@ -24,14 +24,16 @@ const shot = (name) => (out ? page.screenshot({ path: `${out}/${name}.png` }) : 
 async function until(what, test, arg = null) {
   try {
     await page.waitForFunction(
-      ([src, a]) => new Function('s', 'a', `return (${src})(s, a)`)(window.__play(), a),
-      [test.toString(), arg],
-      {
-        polling: 100,
-        timeout: 180_000,
+      ([src, a]) => {
+        const status = document.getElementById('status');
+        if (status?.className === 'fail') throw new Error(`the page failed: ${status.textContent}`);
+        return window.__play ? new Function('s', 'a', `return (${src})(s, a)`)(window.__play(), a) : false;
       },
+      [test.toString(), arg],
+      { polling: 100, timeout: 180_000 },
     );
-  } catch {
+  } catch (e) {
+    if (String(e).includes('the page failed')) throw e;
     throw new Error(
       `timed out waiting for ${what}; the player was at ${JSON.stringify(await state().catch(() => null))}`,
     );
@@ -48,7 +50,8 @@ try {
   if (landed.y < 1 || landed.y > 130) throw new Error(`landed at a height of ${landed.y}`);
   await shot('landed');
 
-  // The player starts facing -z, so W walks north. It only moves if the keys reach the physics.
+  // The player starts facing -z, so W walks north. It only moves if the keys reach the physics. The seed 7 world has
+  // open ground there; a generator change that puts a tree in the way needs another seed or a jump held here.
   await page.keyboard.down('KeyW');
   await until('a walk of 6 blocks', (s, from) => Math.hypot(s.x - from.x, s.z - from.z) > 6, landed);
   await page.keyboard.up('KeyW');

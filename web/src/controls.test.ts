@@ -66,3 +66,22 @@ test('a key that stays down does not repeat a toggle', () => {
   send(keys, 'keydown', 'KeyF');
   expect(controls.takeFlyToggle()).toBe(false);
 });
+
+test('a tap of space between two samples still jumps, once', () => {
+  const { keys, controls } = setup();
+  send(keys, 'keydown', 'Space');
+  send(keys, 'keyup', 'Space');
+  expect(controls.sample().jump).toBe(true);
+  expect(controls.sample().jump).toBe(false);
+});
+
+test("two toggles between samples cancel, and Ctrl+F is the browser's", () => {
+  const { keys, controls } = setup();
+  send(keys, 'keydown', 'KeyF');
+  send(keys, 'keyup', 'KeyF');
+  send(keys, 'keydown', 'KeyF');
+  send(keys, 'keyup', 'KeyF');
+  expect(controls.takeFlyToggle()).toBe(false);
+  keys.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyF', ctrlKey: true }));
+  expect(controls.takeFlyToggle()).toBe(false);
+});
