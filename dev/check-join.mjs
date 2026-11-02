@@ -1,12 +1,15 @@
-// Joins the world `demo` through the gateway the way the game will, and checks what the game relies on: a player the
-// seed let in is in, anyone else and any other world is refused, and a chunk key can be written conditionally, read
-// back with its version, refused when its version is stale, and seen by a second player's watch.
-// Usage: node dev/check-join.mjs [gateway url] [idp url]. The stack must be up (dev/up.sh).
+// Joins the world `demo` (or BLOCKS_WORLD) through the gateway the way the game will, and checks what the game
+// relies on: a player the world is open to is in, anyone else and any other world is refused, and a chunk key can be
+// written conditionally, read back with its version, refused when its version is stale, and seen by a second
+// player's watch.
+// Usage: [BLOCKS_WORLD=name] node dev/check-join.mjs [gateway url] [idp url]. The stack must be up (dev/up.sh). A
+// world made with blocks-tool must be open to both ana and ben.
 import assert from 'node:assert/strict';
 
 const GATEWAY = process.argv[2] ?? 'ws://127.0.0.1:8787/ws';
 const IDP = process.argv[3] ?? 'http://127.0.0.1:9400';
 const AUDIENCE = 'felix-blocks';
+const WORLD = process.env.BLOCKS_WORLD || 'demo';
 // A chunk key of region (0, 0), as core/ names it, that this run alone writes: the cache keeps what was written, so a
 // second run against the same stack would otherwise find the key taken. The last digit is the chunk's height.
 const hex = (n) => Math.floor(Math.random() * n).toString(16);
@@ -96,16 +99,16 @@ async function check(name, run) {
 }
 
 await check('a player in the world joins', async () => {
-  const { session, answer } = await join('ana', 'demo');
+  const { session, answer } = await join('ana', WORLD);
   assert.equal(answer.type, 'hello', JSON.stringify(answer));
-  assert.equal(answer.world, 'demo');
+  assert.equal(answer.world, WORLD);
   assert.deepEqual(answer.features, ['cache_versions']);
   assert.equal(answer.cache_ttl_ms.online, 30_000);
   session.close();
 });
 
 await check('someone the world is not open to is refused', async () => {
-  const { session, answer } = await join('mallory', 'demo');
+  const { session, answer } = await join('mallory', WORLD);
   assert.equal(answer.code, 'forbidden', JSON.stringify(answer));
   session.close();
 });
@@ -117,9 +120,9 @@ await check('a world that does not exist is refused', async () => {
 });
 
 await check('a chunk is written conditionally, read with its version and refused when stale', async () => {
-  const { session: ana, answer } = await join('ana', 'demo');
+  const { session: ana, answer } = await join('ana', WORLD);
   assert.equal(answer.type, 'hello', JSON.stringify(answer));
-  const { session: ben } = await join('ben', 'demo');
+  const { session: ben } = await join('ben', WORLD);
   ben.send({ type: 'cache_watch', cache: 'chunks' });
   await ben.next((m) => m.type === 'cache_entries' && m.cache === 'chunks', 'cache_entries');
 

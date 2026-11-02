@@ -14,8 +14,9 @@ everyone what changed.
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
 > the look, day and night. The project's code is started: the block table,
 > the asset pipeline, meshing, terrain generated from a seed, the keys and
-> values chunks are stored under, and walking around that terrain in first
-> person. Nothing is saved yet. The plan is in
+> values chunks are stored under, `blocks-tool`, which creates a world in
+> Felix, and walking around that terrain in first person. Nothing is saved
+> yet. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
@@ -76,7 +77,8 @@ or Podman with Compose v2 (or podman-compose 1.4 or later), Node 22 for the
 check, and these ports free on localhost: 5000/udp, 8080, 8443, 8787 and 9400.
 It also creates one world, `demo`, that the players `ana` and `ben` may join.
 The world starts empty: its info cache holds nothing until `blocks-tool` writes
-it.
+it. The stack also leaves an administrator's tokens in `dev/state/` for
+`blocks-tool`.
 
 ```bash
 dev/up.sh                  # start the stack and wait until the gateway serves
@@ -84,12 +86,43 @@ node dev/check-join.mjs    # sign in, join the demo world, write a chunk key con
 dev/down.sh                # stop it and delete its data
 ```
 
+To make a world of your own, build the tool and point it at the stack. Sign in
+as `ana` or `ben`, or any other name you give `--owner`; the stand-in provider
+lets anyone pick one.
+
+```bash
+cargo build -p blocks-tool
+export BLOCKS_ISSUER=http://127.0.0.1:9400 \
+  BLOCKS_FELIX_TOKEN_FILE=dev/state/admin.token \
+  BLOCKS_FELIX_DATA_TOKEN_FILE=dev/state/admin-data.token \
+  BLOCKS_FELIX_CA_FILE=dev/state/broker-cert.pem
+target/debug/blocks-tool create play --owner ana --seed 7
+target/debug/blocks-tool create play --owner ben
+BLOCKS_WORLD=play node dev/check-join.mjs   # joins as ana and ben
+```
+
+`create` registers the world's caches and streams with the control plane,
+writes the world's info (its seed, generator version, size and spawn point) to
+the info cache, and lets the owner in. It does these in that order, so nobody
+can join a world that has no info yet. Run it again with another `--owner` to
+let a second player in. Running it again for the same owner changes nothing.
+Leave `--seed` out for a random one; giving a seed that differs from the
+world's stored one is refused, because the seed cannot change once chunks are
+stored. A name is 1 to 32 lowercase letters, digits and hyphens. `blocks-tool
+create --help` lists the other options, and each also reads an environment
+variable (`BLOCKS_FELIX_CONTROL_PLANE`, `BLOCKS_FELIX_BROKER`,
+`BLOCKS_FELIX_SERVER_NAME`, `BLOCKS_TENANT`, `BLOCKS_NAMESPACE`). The tokens
+are for the tenant's administrator; the data token is the one the broker
+checks for cache reads and writes, so the administrator needs `cache.read` and
+`cache.write` on the world's caches (`dev/seed.mjs` grants them for the dev
+stack, where the tokens last 24 hours).
+
 The browser connects to `ws://127.0.0.1:8787/ws`, and signs in at
 `http://127.0.0.1:9400`, which lets anyone pick a name. The stand-in provider
 is for development only. The control plane keeps its state in memory, so
 `dev/up.sh` always starts from nothing. `dev/scope.toml` is the list of
 resources a session in a world can reach, and `dev/seed.mjs` creates them; real
-worlds are made with `blocks-tool`, once it exists.
+worlds are made with `blocks-tool`.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open
@@ -174,14 +207,15 @@ second. [docs/design.md](docs/design.md) has the details.
 
 ## Repository layout
 
-| Path          | What is in it                                                                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/`       | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table and the chunk mesher. Built to WebAssembly for the page |
-| `dev/`        | The Felix stack for development: compose file, sign-in stand-in, seed, and the check that joins through the gateway                           |
-| `web/`        | The browser client: TypeScript and Three.js, built with Vite                                                                                  |
-| `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence                                                                             |
-| `prototype/`  | The style frame, the look the client is built to match                                                                                        |
-| `docs/`       | Design and art direction                                                                                                                      |
+| Path          | What is in it                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/`       | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table, the chunk mesher, world generation, the chunk encoding and keys, and the world info. Built to WebAssembly for the page |
+| `tool/`       | `blocks-tool`, the command line that creates a world in Felix                                                                                                                                                 |
+| `dev/`        | The Felix stack for development: compose file, sign-in stand-in, seed, and the check that joins through the gateway                                                                                           |
+| `web/`        | The browser client: TypeScript and Three.js, built with Vite                                                                                                                                                  |
+| `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence                                                                                                                                             |
+| `prototype/`  | The style frame, the look the client is built to match                                                                                                                                                        |
+| `docs/`       | Design and art direction                                                                                                                                                                                      |
 
 ## Documentation
 

@@ -112,17 +112,33 @@ jobs:
       - run: cargo test --workspace --locked
 
   # Felix, its control plane and the gateway from dev/compose.yml, and a join through the gateway: sign in, read and
-  # write a chunk key conditionally, see another player's change.
+  # write a chunk key conditionally, see another player's change. Then blocks-tool makes a world, twice, and the same
+  # join check runs against it.
   stack:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p blocks-tool --locked
       - run: dev/up.sh
       - run: node dev/check-join.mjs
+      - name: blocks-tool creates a world
+        env:
+          BLOCKS_ISSUER: http://127.0.0.1:9400
+          BLOCKS_FELIX_TOKEN_FILE: dev/state/admin.token
+          BLOCKS_FELIX_DATA_TOKEN_FILE: dev/state/admin-data.token
+          BLOCKS_FELIX_CA_FILE: dev/state/broker-cert.pem
+        run: |
+          target/debug/blocks-tool create play --owner ana --seed 7
+          # A second run for another owner keeps the info and adds the player.
+          target/debug/blocks-tool create play --owner ben | tee create-again.log
+          grep -q 'already has its info (seed 7)' create-again.log
+          BLOCKS_WORLD=play node dev/check-join.mjs
       - if: failure()
         run: docker compose -f dev/compose.yml logs
       - if: always()
