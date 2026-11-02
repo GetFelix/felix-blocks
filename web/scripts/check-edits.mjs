@@ -52,6 +52,7 @@ try {
   await until(ana, 'ana watching ben', second, 6);
   console.log('ana saw ben build live');
 
+  await stopDrawing(ben);
   await ana.close();
   ana = await open('ana');
   await until(ana, 'ana after a reload', first, 5);
