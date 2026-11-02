@@ -252,11 +252,14 @@ block whatever it sends. Presence and chat are open to both.
 ## Rendering
 
 - **Three.js**, plain TypeScript, no UI framework, built with Vite.
-- **Greedy meshing per chunk** in `core`, run in a Web Worker so meshing never blocks a frame. Faces between two solid blocks are culled; coplanar faces of the same block merge into quads. Per-vertex ambient occlusion gives the blocky look its depth.
+- **Greedy meshing per chunk** in `core`, run in a pool of Web Workers so meshing never blocks a frame. Faces between two solid blocks are culled; coplanar faces of the same block merge into quads. Per-vertex ambient occlusion gives the blocky look its depth.
 
   The mesher takes a chunk plus a one-block border of its 26 neighbours (a 16 by 16 layer from each face neighbour, a row from each edge neighbour, a single block from each corner neighbour). With that it hides faces and shades corners across a chunk edge without knowing about other chunks. A border block that is not loaded shows as "unloaded": a face looking into it is not drawn, and it does not shade. The caller fills the border with a chosen block where there is no chunk, such as past the edge of the world, or those outer walls and the world floor are never drawn.
 
-  It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the page has to repeat the tile across it.
+  It returns four meshes, one per draw pass (opaque, cutout, glass, water), as flat arrays: position, normal, tile coordinates, tile and ambient occlusion per vertex. Faces merge only when the block, tile and all four corner levels match. A merged quad is longer than one tile, so the shader repeats the tile across it, as described below.
+
+  The page asks for a chunk with `Mesher.request` (`web/src/mesher.ts`), giving the chunk and its neighbours and a priority, the squared distance from the player. Each worker loads `core` once, meshes one chunk at a time and moves the arrays back without copying them. The nearest chunk goes first, and a chunk that changes again before its job starts is meshed once. Meshing a chunk takes about a millisecond, so one worker keeps up with walking. The pool is for bursts: joining a world, or a view distance of 12 chunks, is thousands of chunks at once, which on the page would be seconds of meshing.
+- **One shader patch for the atlas.** A merged quad is longer than one tile, so each vertex carries its tile and its position in tile units, which runs past 1 across the quad. The fragment shader keeps the fraction, maps it into the tile's rectangle in the atlas, and takes the mip level from the unwrapped coordinate. The wrapped one jumps back to 0 at every tile edge, which would pick the smallest mip there and draw a line. `web/src/terrain.ts` applies the patch to Three's own materials, so lighting, fog and shadows work as usual, and the shadow depth material gets it too so leaves cast their holes.
 - **One texture atlas** built at load time from the block textures, with nearest-neighbour filtering and mipmaps padded so edges do not bleed.
 - **Draw order**: opaque and cutout blocks (leaves) first, then glass, then water, each as its own mesh per chunk.
 - **The look**: bright daylight, soft fog to the view distance, a sky gradient, and the Felix brand in the UI: cyan `hsl(192, 90%, 46%)` for the cursor outline, selection and accents, Inter for text and JetBrains Mono for coordinates and numbers.
@@ -277,7 +280,7 @@ Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 The style frame uses the Voxel Pack and Blocky Characters from
 `web/assets/`, which the client loads the same way. [docs/art.md](art.md) has
 the palette and the restyling. The client builds the atlas from them when it loads. The test scene `/atlas.html` shows it, and
-putting it on chunk meshes is the next step.
+`/chunks.html` draws meshed chunks on it.
 
 ## Build order
 

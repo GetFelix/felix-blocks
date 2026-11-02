@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "assets": "node scripts/check-assets.mjs",
-    "atlas": "node scripts/check-atlas.mjs"
+    "atlas": "node scripts/check-atlas.mjs",
+    "chunks": "node scripts/check-chunks.mjs"
   },
   "dependencies": {
     "three": "0.170.0"
