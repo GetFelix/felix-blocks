@@ -53,6 +53,61 @@ pub fn ground_height(version: u8, seed: u32, x: i32, z: i32) -> Result<i32, JsEr
         .ok_or_else(|| JsError::new("no such generator version"))
 }
 
+/// [`crate::key::ChunkPos::key`]. Throws for a chunk outside the world.
+#[wasm_bindgen(js_name = chunkKey)]
+pub fn chunk_key(cx: i32, cy: i32, cz: i32) -> Result<String, JsError> {
+    crate::key::ChunkPos { cx, cy, cz }
+        .key()
+        .ok_or_else(|| JsError::new("the chunk is outside the world"))
+}
+
+/// [`crate::key::ChunkPos::from_key`] as `[cx, cy, cz]`, or an empty array for a key that names no chunk.
+#[wasm_bindgen(js_name = parseChunkKey)]
+pub fn parse_chunk_key(key: &str) -> Vec<i32> {
+    crate::key::ChunkPos::from_key(key)
+        .map(|p| vec![p.cx, p.cy, p.cz])
+        .unwrap_or_default()
+}
+
+/// [`crate::key::region_prefix`]. Throws for a region outside the world.
+#[wasm_bindgen(js_name = regionPrefix)]
+pub fn region_prefix(rx: i32, rz: i32) -> Result<String, JsError> {
+    crate::key::region_prefix(rx, rz).ok_or_else(|| JsError::new("the region is outside the world"))
+}
+
+fn whole_chunk(chunk: &[u8]) -> Result<(), JsError> {
+    if chunk.len() == crate::chunk::CELLS {
+        Ok(())
+    } else {
+        Err(JsError::new("a chunk is 4096 bytes"))
+    }
+}
+
+/// [`crate::delta::encode`]. Throws if a chunk is not 4,096 bytes or `current` holds 255.
+#[wasm_bindgen(js_name = encodeChunk)]
+pub fn encode_chunk(version: u8, generated: &[u8], current: &[u8]) -> Result<Vec<u8>, JsError> {
+    whole_chunk(generated)?;
+    whole_chunk(current)?;
+    if current.contains(&crate::chunk::UNLOADED) {
+        return Err(JsError::new("255 is not a block"));
+    }
+    Ok(crate::delta::encode(version, generated, current))
+}
+
+/// [`crate::delta::apply`]. `version` is the generator version `generated` was made with. Throws if `generated` is
+/// not 4,096 bytes, the value is malformed, or it is sparse and was written on another generator version.
+#[wasm_bindgen(js_name = applyChunk)]
+pub fn apply_chunk(value: &[u8], version: u8, generated: &[u8]) -> Result<Vec<u8>, JsError> {
+    whole_chunk(generated)?;
+    crate::delta::apply(value, version, generated).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// [`crate::delta::generator_version`]. Throws for a value that is not a chunk value.
+#[wasm_bindgen(js_name = valueGeneratorVersion)]
+pub fn value_generator_version(value: &[u8]) -> Result<u8, JsError> {
+    crate::delta::generator_version(value).map_err(|e| JsError::new(&e.to_string()))
+}
+
 fn pass(index: u8) -> Result<crate::Pass, JsError> {
     match index {
         0 => Ok(crate::Pass::Opaque),
