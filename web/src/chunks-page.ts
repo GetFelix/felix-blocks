@@ -1,4 +1,4 @@
-// The chunk test scene: a made-up world meshed in the worker and drawn the way the game draws it, while the camera
+// The chunk test scene: a generated world meshed in the worker and drawn the way the game draws it, while the camera
 // walks across chunk boundaries. scripts/check-chunks.mjs reads window.__chunksResult once window.__ready is true.
 // ?inline=1 meshes on the page instead, to show what the worker saves. ?adapt=1 lets the frame time choose the view
 // distance, starting at 8, and shows the debug panel; ?tier=N holds the view distance at N chunks; ?debug=1 shows the
@@ -8,12 +8,12 @@ import { atlasTexture, buildAtlas } from './atlas';
 import { loadTiles } from './assets';
 import { ChunkView } from './chunk-view';
 import { loadBlockTable } from './core';
-import { createFixtureWorld } from './fixture-world';
 import { Mesher } from './mesher';
 import { loadMesher, meshChunk, meshedHere } from './meshing';
 import { DebugOverlay } from './debug-overlay';
 import { createLook } from './scene';
 import { terrainMaterials, warmUp } from './terrain';
+import { createGeneratedWorld, TERRAIN_LAYERS } from './worldgen';
 import { fogFor, MAX_TIER, MIN_TIER, ViewDistance } from './view-distance';
 
 interface Result {
@@ -44,6 +44,11 @@ declare global {
 }
 
 const params = new URLSearchParams(location.search);
+// The walk runs north along one line, a few chunks from the middle of a world.
+const SEED = 7;
+const WALK_X = 2061.5;
+const WALK_FROM = 2160;
+const WALK_TO = 2128;
 const inline = params.get('inline') === '1';
 const held = Number(params.get('tier') ?? NaN);
 const fixedTier = Number.isFinite(held) ? Math.max(MIN_TIER, Math.min(MAX_TIER, Math.round(held))) : null;
@@ -91,9 +96,8 @@ function inlineMesher(): Pick<Mesher, 'request' | 'cancel' | 'prioritize' | 'que
 
 async function run() {
   const table = await loadBlockTable();
-  const ids = Object.fromEntries(table.blocks.map((b) => [b.name, b.id]));
   const atlas = buildAtlas(await loadTiles(table.tiles));
-  const world = createFixtureWorld(ids);
+  const world = createGeneratedWorld(SEED);
 
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   const look = createLook(canvas);
@@ -123,7 +127,7 @@ async function run() {
     mesher,
     materials,
     (cx, cy, cz) => (world.chunk(cx, cy, cz) ? world.neighbourhood(cx, cy, cz) : null),
-    world.size[1],
+    TERRAIN_LAYERS,
   );
 
   const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
@@ -137,15 +141,16 @@ async function run() {
   applyTier();
   result.tiers.push(distance.tier);
   const eye = (x: number, z: number) => new THREE.Vector3(x, world.surface(x, z) + 1 + 1.62 + 4, z);
-  const look_at = new THREE.Vector3(64, 21, 64);
+  // Looks ahead along the walk, at the ground there.
+  const lookAhead = (z: number) => new THREE.Vector3(WALK_X + 3, world.surface(WALK_X, z - 24) + 1, z - 24);
   const place = (z: number) => {
-    camera.position.copy(eye(61.5, z));
-    camera.lookAt(look_at);
+    camera.position.copy(eye(WALK_X, z));
+    camera.lookAt(lookAhead(z));
     look.followWithShadow(camera.position);
   };
 
-  // Load what is around the start, then walk toward the house so new chunks stream in at every boundary.
-  place(112);
+  // Load what is around the start, then walk north so new chunks stream in at every boundary.
+  place(WALK_FROM);
   view.update(camera.position, distance.tier);
   while (view.pending > 0) await frame();
   warmUp(renderer, scene, camera, materials);
@@ -174,7 +179,7 @@ async function run() {
 
   let frames = 0;
   let last = await frame();
-  for (let z = 112; z >= 80; z -= 0.4) {
+  for (let z = WALK_FROM; z >= WALK_TO; z -= 0.4) {
     place(z);
     view.update(camera.position, distance.tier);
     renderer.render(scene, camera);
@@ -186,7 +191,7 @@ async function run() {
     if (tick(delta)) result.tiers.push(distance.tier);
   }
   while (view.pending > 0) await frame();
-  place(80);
+  place(WALK_TO);
   view.update(camera.position, distance.tier);
   while (view.pending > 0) await frame();
   renderer.render(scene, camera);
@@ -202,7 +207,7 @@ async function run() {
   const [px, pz] = [Math.floor(camera.position.x / 16), Math.floor(camera.position.z / 16)];
   for (let cz = pz - RADIUS; cz <= pz + RADIUS; cz++)
     for (let cx = px - RADIUS; cx <= px + RADIUS; cx++)
-      for (let cy = 0; cy < world.size[1]; cy++) {
+      for (let cy = 0; cy < TERRAIN_LAYERS; cy++) {
         if ((cx - px) ** 2 + (cz - pz) ** 2 > RADIUS * RADIUS || !world.chunk(cx, cy, cz)) continue;
         result.wanted++;
         if (view.has(cx, cy, cz)) result.drawn++;
