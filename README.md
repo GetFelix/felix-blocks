@@ -123,7 +123,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | Milestone | What it proves | State |
 |---|---|---|
-| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers and view distance tiers done |
+| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
