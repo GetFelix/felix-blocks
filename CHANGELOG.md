@@ -15,8 +15,8 @@ world either in a Felix world or in your own browser. Seeing other players in th
 - A texture atlas with padded mipmaps, so a block seen from far away never shows its neighbour's colour.
 - A chunk mesher that merges faces into larger quads, written in Rust and run in the browser as WebAssembly. Meshing
   happens in a pool of Web Workers, and a shader repeats a texture across a merged quad without seams.
-- A view distance that follows the frame time, with a debug panel (`?debug=1`). It has not been timed on a laptop
-  GPU yet.
+- A view distance that follows the frame time, with a debug panel (`?debug=1`). On a Mac Studio it holds 60 fps at
+  8 chunks and settles at 11; a laptop with an integrated GPU has not been timed yet.
 
 ### A world you can edit
 
