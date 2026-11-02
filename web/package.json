@@ -15,9 +15,11 @@
     "assets": "node scripts/check-assets.mjs",
     "atlas": "node scripts/check-atlas.mjs",
     "chunks": "node scripts/check-chunks.mjs",
-    "play": "node scripts/check-play.mjs"
+    "play": "node scripts/check-play.mjs",
+    "edits": "node scripts/check-edits.mjs"
   },
   "dependencies": {
+    "felix-gateway-client": "https://github.com/GetFelix/felix-gateway/releases/download/v0.8.0/felix-gateway-client-0.8.0.tgz",
     "three": "0.170.0"
   },
   "devDependencies": {

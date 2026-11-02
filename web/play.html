@@ -47,6 +47,27 @@
         bottom: 24px;
         transform: translateX(-50%);
       }
+      #hotbar {
+        position: fixed;
+        left: 50%;
+        top: 16px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 4px;
+        font:
+          500 11px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      #hotbar span {
+        padding: 4px 8px;
+        border-radius: 8px;
+        background: rgba(12, 20, 28, 0.62);
+        color: #e8eef3;
+      }
+      #hotbar span.on {
+        background: hsl(192, 90%, 36%);
+      }
       #hint.hidden {
         display: none;
       }
@@ -65,8 +86,10 @@
   <body>
     <canvas id="view"></canvas>
     <div id="cross"></div>
+    <div id="hotbar"></div>
     <div id="hint">
-      Click to look around. WASD walk, space jump, shift sprint, F or double-tap space fly (shift sinks)
+      Click to look around. WASD walk, space jump, shift sprint, F or double-tap space fly (shift sinks). Left click
+      digs, right click places, 1 to 9 or the wheel pick the block
     </div>
     <div id="status">loading</div>
     <script type="module" src="/src/play-page.ts"></script>

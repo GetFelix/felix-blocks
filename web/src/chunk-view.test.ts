@@ -120,3 +120,26 @@ test('a chunk that is shown and later dropped leaves the scene', async () => {
   v.update(at(5, 0), 0);
   expect(scene.children).toHaveLength(0);
 });
+
+test('a changed chunk is meshed again and its old mesh stays until the new one arrives', async () => {
+  const { mesher, scene, view: v } = view();
+  v.update(at(0, 0), 0);
+  mesher.calls[0]!.resolve({ data: empty, ms: 1 });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(v.has(0, 0, 0)).toBe(true);
+  const before = scene.children.length;
+
+  v.invalidate([
+    [0, 0, 0],
+    [5, 0, 5],
+  ]);
+  expect(mesher.calls.map((c) => c.key)).toEqual(['0,0,0', '0,0,0']);
+  expect(v.has(0, 0, 0)).toBe(true);
+  expect(scene.children.length).toBe(before);
+  mesher.calls[1]!.resolve({ data: empty, ms: 1 });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(v.pending).toBe(0);
+  expect(scene.children.length).toBe(before);
+});

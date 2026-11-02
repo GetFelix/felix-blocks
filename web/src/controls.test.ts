@@ -85,3 +85,21 @@ test("two toggles between samples cancel, and Ctrl+F is the browser's", () => {
   keys.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyF', ctrlKey: true }));
   expect(controls.takeFlyToggle()).toBe(false);
 });
+
+test('buttons ask for a dig or a place, and digits and the wheel pick the slot', () => {
+  const { keys, controls } = setup();
+  controls.press({ button: 0 });
+  controls.press({ button: 2 });
+  controls.press({ button: 1 });
+  expect(controls.takeActions()).toEqual(['dig', 'place']);
+  expect(controls.takeActions()).toEqual([]);
+  send(keys, 'keydown', 'Digit4');
+  expect(controls.slot).toBe(3);
+  controls.scroll({ deltaY: -1 });
+  expect(controls.slot).toBe(2);
+  controls.slot = 0;
+  controls.scroll({ deltaY: -1 });
+  expect(controls.slot).toBe(8);
+  controls.scroll({ deltaY: 1 });
+  expect(controls.slot).toBe(0);
+});
