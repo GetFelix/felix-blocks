@@ -88,9 +88,23 @@ to check it headless. The check fails if:
   draws both with the wrong shader and fails if it does not see seams, so it is known to
   notice them.
 
-Not done yet: the sky light that darkens caves and eaves, and plants. The
-frame time on a laptop iGPU is measured when the view distance tiers land;
-headless Chromium renders in software and cannot say.
+Not done yet: the sky light that darkens caves and eaves, and plants.
+
+### View distance and the debug panel
+
+The view distance, 4 to 12 chunks, follows the frame time (see
+[design.md](design.md#rendering)). `/chunks.html?adapt=1` starts at 8 chunks and
+shows a panel with the distance, the frame rate, the chunks loaded and the last
+changes; `?debug=1` shows the panel alone and F3 toggles it. `?slow=40` adds 40
+ms of work to each frame, which makes the distance step down, as in the picture:
+the fog closes in with it.
+
+![The debug panel after a step down from 8 to 4 chunks](screenshots/view-distance-panel.jpg)
+
+CI runs that case and fails if the distance does not come down or the panel does
+not say so. Whether a laptop iGPU holds 60 fps at 8 chunks is not something
+headless Chromium can answer, because it renders in software. It has to be
+measured on the hardware, with the panel.
 
 ## Night
 

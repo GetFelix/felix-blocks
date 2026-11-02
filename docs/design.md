@@ -266,6 +266,8 @@ block whatever it sends. Presence and chat are open to both.
 - **Players** as blocky characters with their name above them.
 - **View distance tiers**, 4 to 12 chunks, picked from the frame time. The target is 60 fps at 8 chunks on a laptop iGPU.
 
+  `ViewDistance` (`web/src/view-distance.ts`) takes each frame's time and answers with a tier. It averages 30 frames. A mean more than 10% over the 16.7 ms budget means the frame rate is slipping, and it steps down at once: one tier for a small overrun, or straight to the tier that should fit when the frames are far over, since the cost follows the square of the distance. After a change it ignores 20 frames while the new chunks load. It tries one tier further only after 5 seconds at budget. If that step up has to be undone within 15 seconds, the next try waits twice as long, so a machine that sits on the edge settles instead of flapping. Fog ends one chunk inside the loaded area, so the edge never shows.
+
 ### Assets
 
 Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:

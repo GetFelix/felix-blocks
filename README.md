@@ -27,7 +27,8 @@ There is nothing to play yet. What runs today is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
 the atlas page, which packs the textures into one atlas and shows each at a
 distance, and the chunks page, which draws a made-up world meshed in Web Workers
-while the camera walks through it.
+while the camera walks through it (add `?adapt=1` to let the frame time pick the
+view distance, and see why in the debug panel).
 
 You need Node 22, Rust 1.97 with the `wasm32-unknown-unknown` target (`rustup`
 installs both from `rust-toolchain.toml`), and `wasm-bindgen-cli` 0.2.129
@@ -46,8 +47,9 @@ and `npm run build` in `web/`, and `cargo fmt --check`, `cargo clippy` and
 headless Chromium and fails if a texture or model does not load, and
 `npm run atlas -- <url>` fails if an atlas tile shows a neighbour's colour at a
 distance. `npm run chunks -- <url of chunks.html>` meshes and draws the made-up
-world, and fails if the page does any of the meshing itself or if a merged quad
-does not look like the separate blocks it replaces.
+world, and fails if the page does any of the meshing itself, if a merged quad
+does not look like the separate blocks it replaces, or if the view distance does
+not follow the frame time.
 
 The [style frame](prototype/style-frame.html) is a single page: serve the
 repository root with `python3 -m http.server` and open
@@ -121,7 +123,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | Milestone | What it proves | State |
 |---|---|---|
-| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher and meshing in workers done |
+| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers and view distance tiers done |
 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
