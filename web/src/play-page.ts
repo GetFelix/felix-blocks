@@ -43,8 +43,11 @@ declare global {
       /** Whether the page is saving to a world. */
       saving: boolean;
     };
-    /** Milliseconds from the start of the page: the saved chunks arrived, were taken in, and the first frame was drawn. */
-    __timing?: { entries?: number; ingested?: number; firstFrame?: number };
+    /**
+     * Milliseconds from the start of the page: the gateway answered the join (`joinMs` is how long that took), the saved
+     * chunks arrived and were taken in, and the first frame was drawn. A busy main thread delays `entries` and later.
+     */
+    __timing?: { joinMs?: number; entries?: number; ingested?: number; firstFrame?: number };
   }
 }
 
@@ -104,7 +107,9 @@ async function run() {
   let offline: OfflineWorld | null = null;
   let start: WorldStart;
   if (gateway && worldName && token) {
+    const joinStart = performance.now();
     const joined = await join(gateway, worldName, token);
+    timing.joinMs = performance.now() - joinStart;
     client = joined.client;
     try {
       if (!joined.info) throw new Error(`world ${worldName} has no info yet: make it with blocks-tool create`);
