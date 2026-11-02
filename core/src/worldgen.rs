@@ -20,13 +20,16 @@ pub const GENERATOR_VERSION: u8 = 1;
 /// A world's size in chunks: x, y (up) and z.
 pub const WORLD_CHUNKS: [i32; 3] = [256, 16, 256];
 
-/// Water fills every column below this height.
+/// Water fills a column up to and including the block at this height, where the ground is lower.
 pub const SEA_LEVEL: i32 = 70;
 
 const MIN_HEIGHT: i32 = 40;
 /// The highest ground any seed makes. Chunks starting more than a tree above it are air.
 const MAX_HEIGHT: i32 = MIN_HEIGHT + 75;
 const MAX_TREE: i32 = 9;
+
+/// Chunks from the bottom that can hold anything but air: layer 8 and above are always air.
+pub const TERRAIN_LAYERS: i32 = (MAX_HEIGHT + MAX_TREE) / SIZE as i32 + 1;
 
 // Salts keep the noises of one seed independent of each other.
 const CONTINENT: u32 = 1;
@@ -54,7 +57,7 @@ pub fn generate_chunk(version: u8, seed: u32, cx: i32, cy: i32, cz: i32) -> Opti
     }
     let mut blocks = vec![AIR; CELLS];
     let (x0, y0, z0) = (cx * SIZE as i32, cy * SIZE as i32, cz * SIZE as i32);
-    if y0 > MAX_HEIGHT + MAX_TREE {
+    if cy >= TERRAIN_LAYERS {
         return Some(blocks);
     }
     fill_ground(&mut blocks, seed, x0, y0, z0);
@@ -166,6 +169,10 @@ fn tree_at(seed: u32, x: i32, z: i32, ground: i32) -> Option<i32> {
 /// Trees are drawn into every chunk they touch, so one that stands on a chunk edge is whole on both sides. Leaves
 /// only fill air and logs overwrite, which makes the result the same whichever tree comes first.
 fn grow_trees(blocks: &mut [u8], seed: u32, x0: i32, y0: i32, z0: i32) {
+    // Ground is never lower than MIN_HEIGHT, so a chunk entirely below it has no trunk or leaf.
+    if y0 + (SIZE as i32) < MIN_HEIGHT {
+        return;
+    }
     let reach = 2;
     let mut trees = Vec::new();
     for z in z0 - reach..z0 + SIZE as i32 + reach {

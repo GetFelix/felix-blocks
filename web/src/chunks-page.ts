@@ -13,7 +13,7 @@ import { loadMesher, meshChunk, meshedHere } from './meshing';
 import { DebugOverlay } from './debug-overlay';
 import { createLook } from './scene';
 import { terrainMaterials, warmUp } from './terrain';
-import { createGeneratedWorld, TERRAIN_LAYERS } from './worldgen';
+import { createGeneratedWorld, loadGenerator, terrainLayers } from './worldgen';
 import { fogFor, MAX_TIER, MIN_TIER, ViewDistance } from './view-distance';
 
 interface Result {
@@ -97,6 +97,8 @@ function inlineMesher(): Pick<Mesher, 'request' | 'cancel' | 'prioritize' | 'que
 async function run() {
   const table = await loadBlockTable();
   const atlas = buildAtlas(await loadTiles(table.tiles));
+  await loadGenerator();
+  const layers = terrainLayers();
   const world = createGeneratedWorld(SEED);
 
   const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -127,7 +129,7 @@ async function run() {
     mesher,
     materials,
     (cx, cy, cz) => (world.chunk(cx, cy, cz) ? world.neighbourhood(cx, cy, cz) : null),
-    TERRAIN_LAYERS,
+    layers,
   );
 
   const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
@@ -207,7 +209,7 @@ async function run() {
   const [px, pz] = [Math.floor(camera.position.x / 16), Math.floor(camera.position.z / 16)];
   for (let cz = pz - RADIUS; cz <= pz + RADIUS; cz++)
     for (let cx = px - RADIUS; cx <= px + RADIUS; cx++)
-      for (let cy = 0; cy < TERRAIN_LAYERS; cy++) {
+      for (let cy = 0; cy < layers; cy++) {
         if ((cx - px) ** 2 + (cz - pz) ** 2 > RADIUS * RADIUS || !world.chunk(cx, cy, cz)) continue;
         result.wanted++;
         if (view.has(cx, cy, cz)) result.drawn++;

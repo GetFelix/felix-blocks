@@ -1,17 +1,28 @@
 // A world's generated terrain. The rules live in core/ (Rust); this holds the chunks the page has asked for so a
 // chunk and its 26 neighbours do not regenerate 27 times.
-import init, { generateChunk, generatorVersion, groundHeight } from './core/felix_blocks_core.js';
+import init, {
+  generateChunk,
+  generatorVersion,
+  groundHeight,
+  seaLevel,
+  terrainLayers,
+  worldChunks,
+} from './core/felix_blocks_core.js';
 import type { ChunkNeighbourhood } from './meshing';
 
 export const CHUNK = 16;
-/** A world's size in chunks: x, y (up) and z. */
-export const WORLD_CHUNKS = [256, 16, 256] as const;
-/** Water fills every column below this height. */
-export const SEA_LEVEL = 70;
-/** Chunks from the bottom that can hold anything but air, in generator version 1. */
-export const TERRAIN_LAYERS = 8;
-/** Chunks kept after they are generated, nearest the last request first to go. About 4 KiB each. */
-const KEEP = 4096;
+// The world's rules come from core, so there is one copy. `seaLevel()`: water fills a column up to and including
+// that block. `worldChunks()`: the size in chunks, x, y (up), z. `terrainLayers()`: layers from the bottom that can
+// hold anything but air.
+export { seaLevel, terrainLayers, worldChunks };
+/**
+ * Chunks kept after they are generated; the one used longest ago goes first. About 4 KiB each. A view at the largest
+ * tier (12) spans 25 x 25 columns and the mesher reads a ring more, so 27 x 27 columns of 9 layers (8 and the air
+ * above) is 6,561 chunks; this leaves room for the walk between requests.
+ */
+const KEEP = 8192;
+const MAX_SEED = 0xffffffff;
+const MAX_VERSION = 255;
 
 export interface GeneratedWorld {
   readonly seed: number;
@@ -30,11 +41,14 @@ export async function loadGenerator(wasm?: BufferSource): Promise<number> {
   return generatorVersion();
 }
 
-const inside = (cx: number, cy: number, cz: number) =>
-  cx >= 0 && cy >= 0 && cz >= 0 && cx < WORLD_CHUNKS[0] && cy < WORLD_CHUNKS[1] && cz < WORLD_CHUNKS[2];
-
-/** The terrain of one seed. `loadGenerator` has to have finished. */
+/** The terrain of one seed, a whole number from 0 to 2^32 - 1. `loadGenerator` has to have finished. */
 export function createGeneratedWorld(seed: number, version = generatorVersion()): GeneratedWorld {
+  if (!Number.isInteger(seed) || seed < 0 || seed > MAX_SEED) throw new RangeError(`seed ${seed} is not a u32`);
+  if (!Number.isInteger(version) || version < 0 || version > MAX_VERSION)
+    throw new RangeError(`version ${version} is not a u8`);
+  const [wx, wy, wz] = Array.from(worldChunks()) as [number, number, number];
+  const sea = seaLevel();
+  const inside = (cx: number, cy: number, cz: number) => cx >= 0 && cy >= 0 && cz >= 0 && cx < wx && cy < wy && cz < wz;
   const made = new Map<string, Uint8Array>();
   const read = (cx: number, cy: number, cz: number) => {
     if (!inside(cx, cy, cz)) return null;
@@ -62,7 +76,7 @@ export function createGeneratedWorld(seed: number, version = generatorVersion())
     },
     surface(x, z) {
       const clamp = (v: number, size: number) => Math.max(0, Math.min(size * CHUNK - 1, Math.floor(v)));
-      return Math.max(groundHeight(version, seed, clamp(x, WORLD_CHUNKS[0]), clamp(z, WORLD_CHUNKS[2])), SEA_LEVEL);
+      return Math.max(groundHeight(version, seed, clamp(x, wx), clamp(z, wz)), sea);
     },
   };
 }

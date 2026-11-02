@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { CHUNK, createGeneratedWorld, loadGenerator, SEA_LEVEL, TERRAIN_LAYERS } from './worldgen';
+import { CHUNK, createGeneratedWorld, loadGenerator, seaLevel, terrainLayers, worldChunks } from './worldgen';
 
 const wasm = readFileSync(new URL('./core/felix_blocks_core_bg.wasm', import.meta.url));
 const golden = readFileSync(new URL('../../core/testdata/worldgen.golden', import.meta.url), 'utf8')
@@ -44,7 +44,7 @@ test('nothing above the terrain layers is anything but air', async () => {
   await loadGenerator(wasm);
   for (const seed of [1, 99, 0xdeadbeef]) {
     const world = createGeneratedWorld(seed);
-    for (let cx = 0; cx < 256; cx += 51) expect(world.chunk(cx, TERRAIN_LAYERS, cx)!.every((b) => b === 0)).toBe(true);
+    for (let cx = 0; cx < 256; cx += 51) expect(world.chunk(cx, terrainLayers(), cx)!.every((b) => b === 0)).toBe(true);
   }
 });
 
@@ -57,10 +57,26 @@ test('the surface is never below the sea', async () => {
     [2000.5, 3000.2],
     [99999, 99999],
   ] as const)
-    expect(world.surface(x, z)).toBeGreaterThanOrEqual(SEA_LEVEL);
+    expect(world.surface(x, z)).toBeGreaterThanOrEqual(seaLevel());
 });
 
 test('an unknown generator version throws', async () => {
   await loadGenerator(wasm);
   expect(() => createGeneratedWorld(1, 9).chunk(0, 0, 0)).toThrow();
+});
+
+test("a seed or version that does not fit core's integers is refused", async () => {
+  await loadGenerator(wasm);
+  for (const seed of [-1, 1.5, 0x1_0000_0000, NaN, Infinity])
+    expect(() => createGeneratedWorld(seed)).toThrow(RangeError);
+  for (const version of [-1, 1.5, 256, 257, NaN]) expect(() => createGeneratedWorld(1, version)).toThrow(RangeError);
+  expect(() => createGeneratedWorld(0)).not.toThrow();
+  expect(() => createGeneratedWorld(0xffffffff)).not.toThrow();
+});
+
+test('the world rules come from core', async () => {
+  await loadGenerator(wasm);
+  expect(seaLevel()).toBe(70);
+  expect(Array.from(worldChunks())).toEqual([256, 16, 256]);
+  expect(terrainLayers()).toBe(8);
 });

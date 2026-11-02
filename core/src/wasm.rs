@@ -14,6 +14,24 @@ pub fn generator_version() -> u8 {
     crate::worldgen::GENERATOR_VERSION
 }
 
+/// [`crate::worldgen::SEA_LEVEL`].
+#[wasm_bindgen(js_name = seaLevel)]
+pub fn sea_level() -> i32 {
+    crate::worldgen::SEA_LEVEL
+}
+
+/// [`crate::worldgen::WORLD_CHUNKS`]: x, y (up) and z.
+#[wasm_bindgen(js_name = worldChunks)]
+pub fn world_chunks() -> Vec<i32> {
+    crate::worldgen::WORLD_CHUNKS.to_vec()
+}
+
+/// [`crate::worldgen::TERRAIN_LAYERS`].
+#[wasm_bindgen(js_name = terrainLayers)]
+pub fn terrain_layers() -> i32 {
+    crate::worldgen::TERRAIN_LAYERS
+}
+
 /// [`crate::worldgen::generate_chunk`]: 4,096 block ids. Throws for a generator version that does not exist and for a
 /// chunk outside the world.
 #[wasm_bindgen(js_name = generateChunk)]

@@ -4,7 +4,20 @@ use std::collections::BTreeMap;
 
 const GOLDEN: &str = "testdata/worldgen.golden";
 
-/// A spread of chunks: both world corners, the middle, and places in between, at heights from bedrock to sky.
+/// The highest ground of each golden seed, as a chunk column (found by scanning the whole world). The tallest
+/// trees stand here, with tops near y 120.
+const PEAKS: [(u32, i32, i32); 7] = [
+    (0, 159, 183),
+    (1, 116, 175),
+    (42, 63, 207),
+    (12345, 112, 223),
+    (0xDEAD_BEEF, 72, 188),
+    (u32::MAX, 223, 161),
+    (777, 96, 79),
+];
+
+/// A spread of chunks: both world corners, the middle, and places in between, in every layer that can hold
+/// anything (0 to 7), plus the two top layers over each seed's highest ground.
 fn golden_chunks() -> Vec<(u32, i32, i32, i32)> {
     let seeds = [0, 1, 42, 12345, 0xDEAD_BEEF, u32::MAX, 777];
     let columns = [
@@ -15,13 +28,17 @@ fn golden_chunks() -> Vec<(u32, i32, i32, i32)> {
         (100, 3),
         (15, 16),
     ];
-    let heights = [0, 2, 4, 5, 6, 7, 8];
     let mut out = Vec::new();
     for seed in seeds {
         for (cx, cz) in columns {
-            for cy in heights {
+            for cy in 0..TERRAIN_LAYERS {
                 out.push((seed, cx, cy, cz));
             }
+        }
+    }
+    for (seed, cx, cz) in PEAKS {
+        for cy in [TERRAIN_LAYERS - 2, TERRAIN_LAYERS - 1] {
+            out.push((seed, cx, cy, cz));
         }
     }
     out
@@ -166,9 +183,26 @@ fn the_ground_is_where_ground_height_says() {
 }
 
 #[test]
-fn nothing_grows_above_the_highest_ground_and_the_bottom_is_never_hollow() {
+fn layer_8_and_above_are_always_air_and_the_bottom_is_never_hollow() {
+    assert_eq!(TERRAIN_LAYERS, 8);
     let sky = generate_chunk(1, 3, 50, 8, 50).unwrap();
     assert!(sky.iter().all(|b| *b == AIR));
+    // The shortcut in generate_chunk has to agree with the generator itself, over the highest ground.
+    for (seed, cx, cz) in PEAKS {
+        for cy in TERRAIN_LAYERS..WORLD_CHUNKS[1] {
+            assert!(
+                generate_chunk(1, seed, cx, cy, cz)
+                    .unwrap()
+                    .iter()
+                    .all(|b| *b == AIR)
+            );
+            let mut raw = vec![AIR; CELLS];
+            let (x0, y0, z0) = (cx * SIZE as i32, cy * SIZE as i32, cz * SIZE as i32);
+            fill_ground(&mut raw, seed, x0, y0, z0);
+            grow_trees(&mut raw, seed, x0, y0, z0);
+            assert!(raw.iter().all(|b| *b == AIR), "{seed} {cx} {cy} {cz}");
+        }
+    }
     for cz in 0..6 {
         let floor = generate_chunk(1, 3, 40 + cz, 0, 40).unwrap();
         for z in 0..16 {
@@ -181,25 +215,89 @@ fn nothing_grows_above_the_highest_ground_and_the_bottom_is_never_hollow() {
     }
 }
 
-/// A tree on a chunk's edge has to be whole in both chunks, or the seam would show a trunk with half a crown.
 #[test]
-fn trees_are_whole_across_chunk_edges() {
-    let mut checked = 0;
-    for cx in 100..160 {
-        let here = generate_chunk(1, 21, cx, 4, 100).unwrap();
-        let next = generate_chunk(1, 21, cx + 1, 4, 100).unwrap();
-        for z in 0..16 {
-            for y in 0..15 {
-                // The top log of a tree has leaves on all four sides of it.
-                if here[cell(15, y, z)] == OAK_LOG && here[cell(15, y + 1, z)] != OAK_LOG {
-                    assert!(
-                        matches!(next[cell(0, y, z)], LEAVES | OAK_LOG),
-                        "no crown at {cx}, {y}, {z}"
-                    );
-                    checked += 1;
+fn water_reaches_the_sea_level_block_and_iron_stays_below_60() {
+    let (mut top_water, mut iron_top) = (0, 0);
+    for cz in 120..130 {
+        for cx in 120..130 {
+            for cy in 0..TERRAIN_LAYERS {
+                let chunk = generate_chunk(1, 5, cx, cy, cz).unwrap();
+                for (i, b) in chunk.iter().enumerate() {
+                    let y = cy * SIZE as i32 + ((i >> 8) & 15) as i32;
+                    match *b {
+                        WATER => top_water = top_water.max(y),
+                        IRON_ORE => iron_top = iron_top.max(y),
+                        _ => {}
+                    }
                 }
             }
         }
     }
-    assert!(checked > 0, "no tree stood on a chunk edge to check");
+    assert_eq!(top_water, SEA_LEVEL);
+    assert!((1..60).contains(&iron_top), "iron up to {iron_top}");
+}
+
+/// Ground sits around 77 and a column only reaches the 115 limit in theory.
+#[test]
+fn typical_ground_is_near_77() {
+    let mut heights = Vec::new();
+    for seed in [1, 42, 777] {
+        for cz in (0..256).step_by(3) {
+            for cx in (0..256).step_by(3) {
+                heights.push(ground_height(1, seed, cx * 16 + 8, cz * 16 + 8).unwrap());
+            }
+        }
+    }
+    heights.sort();
+    let median = heights[heights.len() / 2];
+    assert!((75..=79).contains(&median), "median ground {median}");
+    assert!(*heights.last().unwrap() < MAX_HEIGHT);
+}
+
+/// A tree on a chunk's edge has to be whole in both chunks, or the seam would show a trunk with half a crown.
+/// Checks both ways: a trunk on the left chunk's last column and on the right chunk's first.
+#[test]
+fn trees_are_whole_across_chunk_edges() {
+    // Cell in the first chunk, the cell beside it in the second, along an axis, for a position along the edge.
+    type Seam = fn(usize, usize) -> (usize, usize, usize, usize, usize, usize);
+    let seams: [(&str, (i32, i32), Seam); 2] = [
+        ("x", (1, 0), |y, k| (15, y, k, 0, y, k)),
+        ("z", (0, 1), |y, k| (k, y, 15, k, y, 0)),
+    ];
+    let mut checked = [0; 4];
+    for (n, (axis, (dx, dz), seam)) in seams.into_iter().enumerate() {
+        for i in 100..160 {
+            let (cx, cz) = if axis == "x" { (i, 100) } else { (100, i) };
+            let a = generate_chunk(1, 21, cx, 4, cz).unwrap();
+            let b = generate_chunk(1, 21, cx + dx, 4, cz + dz).unwrap();
+            for k in 0..16 {
+                for y in 0..15 {
+                    let (ax, ay, az, bx, by, bz) = seam(y, k);
+                    // The top log of a tree has leaves on all four sides of it.
+                    let top = |c: &[u8], x, y, z| {
+                        c[cell(x, y, z)] == OAK_LOG && c[cell(x, y + 1, z)] != OAK_LOG
+                    };
+                    let crown = |c: &[u8], x, y, z| matches!(c[cell(x, y, z)], LEAVES | OAK_LOG);
+                    if top(&a, ax, ay, az) {
+                        assert!(
+                            crown(&b, bx, by, bz),
+                            "no crown past {axis} edge at {i}, {y}, {k}"
+                        );
+                        checked[n * 2] += 1;
+                    }
+                    if top(&b, bx, by, bz) {
+                        assert!(
+                            crown(&a, ax, ay, az),
+                            "no crown before {axis} edge at {i}, {y}, {k}"
+                        );
+                        checked[n * 2 + 1] += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        checked.iter().all(|c| *c > 0),
+        "an edge went unchecked: {checked:?}"
+    );
 }
