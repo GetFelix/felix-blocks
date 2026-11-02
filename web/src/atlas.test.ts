@@ -22,9 +22,8 @@ test('every tile has its own cell with the padding inside it', () => {
   expect(new Set([...l.origin.values()].map((o) => `${o.x},${o.y}`)).size).toBe(names.length);
 });
 
-test('padding is enough for four mip levels', () => {
-  // A 128 px tile has a 16 px border at level 0; a mip level needs at least a texel of it.
-  expect(PAD / 2 ** 4).toBeGreaterThanOrEqual(1);
+test('the padding keeps at least one texel of border through mip level 4', () => {
+  expect(layoutAtlas(names).pad / 2 ** 4).toBeGreaterThanOrEqual(1);
 });
 
 test('uv rectangles sit inside the atlas, are one tile wide and do not overlap', () => {

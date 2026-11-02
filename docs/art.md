@@ -52,7 +52,7 @@ desaturated so it sits behind the grass. Everything else keeps Kenney's colours.
 - **Textures are crisp up close.** Nearest-neighbour magnification, mipmaps for
   distance, and 16 px of padding around each tile in the atlas so mipmaps never
   bleed a neighbour in. The padding repeats the tile's edge pixels and is enough
-  for the first four mip levels, past which a tile is under ten pixels on screen.
+  for mip levels 0 to 4, down to a tile 8 pixels wide on screen.
   `/atlas.html` draws every tile at several sizes, and CI compares each with the
   same tile on its own.
 - **Three passes.** Opaque blocks, cut-out blocks (leaves, plants) with an alpha

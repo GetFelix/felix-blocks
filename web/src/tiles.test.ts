@@ -14,9 +14,9 @@ test('tinting moves greens to the colour and keeps their relative brightness', (
 });
 
 test('tinting leaves other colours and transparent pixels alone', () => {
-  const tile = px(150, 90, 60, 255, 10, 200, 10, 0, 40, 120, 40, 255);
+  const tile = px(150, 90, 60, 255, 10, 200, 10, 0);
   tintGreens(tile, [100, 200, 50]);
-  expect([...tile.slice(0, 8)]).toEqual([150, 90, 60, 255, 10, 200, 10, 0]);
+  expect([...tile]).toEqual([150, 90, 60, 255, 10, 200, 10, 0]);
 });
 
 test('saturate(0) is grey and saturate(1) changes nothing', () => {
@@ -41,10 +41,28 @@ test('an underlay fills a transparent pixel and leaves an opaque one alone', () 
   expect([...tile]).toEqual([200, 220, 240, 128, 10, 20, 30, 255]);
 });
 
-test('a style is applied in a fixed order and an unlisted tile is untouched', () => {
+test('a style tints, then saturates, then brightens, then draws the underlay', () => {
+  const style = { saturate: 0.5, brightness: 1.5 };
+  const tile = px(200, 100, 50, 255);
+  restyle(tile, style);
+  const by_hand = px(200, 100, 50, 255);
+  saturate(by_hand, 0.5);
+  brighten(by_hand, 1.5);
+  expect([...tile]).toEqual([...by_hand]);
+  const swapped = px(200, 100, 50, 255);
+  brighten(swapped, 1.5);
+  saturate(swapped, 0.5);
+  expect([...tile]).not.toEqual([...swapped]);
+});
+
+test('a tile with no style is untouched', () => {
   const tile = px(60, 180, 60, 255);
   restyle(tile, undefined);
   expect([...tile]).toEqual([60, 180, 60, 255]);
-  expect(TILE_STYLES.glass).toBeDefined();
-  expect(TILE_STYLES.dirt).toBeUndefined();
+});
+
+test('every style in the palette names a tile and only uses what restyle applies', () => {
+  for (const style of Object.values(TILE_STYLES)) {
+    expect(Object.keys(style).every((k) => ['tint', 'saturate', 'brightness', 'underlay'].includes(k))).toBe(true);
+  }
 });

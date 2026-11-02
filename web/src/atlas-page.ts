@@ -31,7 +31,7 @@ const pad = Number(new URLSearchParams(location.search).get('pad') ?? PAD);
 const result: Result = { pad, tiles: 0, quads: 0, bad: [], failures: [] };
 
 /** The tile alone in its own texture, clamped at the edges: what the atlas has to look like at every distance. */
-function aloneMaterial(atlas: Atlas, name: string) {
+function aloneMaterial(atlas: Atlas, name: string, transparent: boolean) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = TILE_SIZE;
   canvas.getContext('2d')!.putImageData(new ImageData(atlas.tiles.get(name)!, TILE_SIZE, TILE_SIZE), 0, 0);
@@ -39,7 +39,7 @@ function aloneMaterial(atlas: Atlas, name: string) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
-  return new THREE.MeshBasicMaterial({ map: texture });
+  return new THREE.MeshBasicMaterial({ map: texture, transparent });
 }
 
 function quad(uv: readonly number[], size: number, x: number, y: number, material: THREE.Material) {
@@ -64,22 +64,7 @@ async function run() {
   renderer.setSize(width, height, false);
   renderer.setClearColor(0xff00ff);
 
-  // The same quads twice: cut out of the atlas, and from a texture of the tile alone.
-  const atlasMaterial = new THREE.MeshBasicMaterial({ map: atlasTexture(atlas, 1) });
   const camera = new THREE.OrthographicCamera(0, width, height, 0, -1, 1);
-  const rects: { tile: string; size: number; x: number; y: number }[] = [];
-  const fromAtlas = new THREE.Scene();
-  const alone = new THREE.Scene();
-  let y = GAP;
-  for (const size of SIZES) {
-    table.tiles.forEach((tile, i) => {
-      const x = GAP + i * (SIZES[0]! + GAP);
-      fromAtlas.add(quad(tileUv(atlas.layout, tile), size, x, y, atlasMaterial));
-      alone.add(quad([0, 0, 1, 1], size, x, y, aloneMaterial(atlas, tile)));
-      rects.push({ tile, size, x, y });
-    });
-    y += size + GAP;
-  }
   const gl = renderer.getContext();
   const read = (scene: THREE.Scene) => {
     renderer.render(scene, camera);
@@ -87,25 +72,43 @@ async function run() {
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, px);
     return px;
   };
-  const expected = read(alone);
-  const px = read(fromAtlas);
-
-  for (const r of rects) {
-    let pixels = 0;
-    for (let yy = r.y; yy < r.y + r.size; yy++) {
-      for (let xx = r.x; xx < r.x + r.size; xx++) {
-        const i = (yy * width + xx) * 4;
-        for (let c = 0; c < 3; c++) {
-          if (Math.abs(px[i + c]! - expected[i + c]!) > TOLERANCE) {
-            pixels++;
-            break;
-          }
+  const texture = atlasTexture(atlas, 1);
+  const bad = new Map<string, { tile: string; size: number; pixels: number }>();
+  let quads = 0;
+  // Drawn twice: opaque, which shows the colour channels, and blended over the magenta, which also shows alpha.
+  for (const transparent of [false, true]) {
+    // The same quads twice: cut out of the atlas, and from a texture of the tile alone.
+    const atlasMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent });
+    const rects: { tile: string; size: number; x: number; y: number }[] = [];
+    const fromAtlas = new THREE.Scene();
+    const alone = new THREE.Scene();
+    let y = GAP;
+    for (const size of SIZES) {
+      table.tiles.forEach((tile, i) => {
+        const x = GAP + i * (SIZES[0]! + GAP);
+        fromAtlas.add(quad(tileUv(atlas.layout, tile), size, x, y, atlasMaterial));
+        alone.add(quad([0, 0, 1, 1], size, x, y, aloneMaterial(atlas, tile, transparent)));
+        rects.push({ tile, size, x, y });
+      });
+      y += size + GAP;
+    }
+    const expected = read(alone);
+    const px = read(fromAtlas);
+    quads = rects.length;
+    for (const r of rects) {
+      let pixels = 0;
+      for (let yy = r.y; yy < r.y + r.size; yy++) {
+        for (let xx = r.x; xx < r.x + r.size; xx++) {
+          const i = (yy * width + xx) * 4;
+          if ([0, 1, 2].some((c) => Math.abs(px[i + c]! - expected[i + c]!) > TOLERANCE)) pixels++;
         }
       }
+      const id = `${r.tile}/${r.size}`;
+      if (pixels > (bad.get(id)?.pixels ?? 0)) bad.set(id, { tile: r.tile, size: r.size, pixels });
     }
-    result.quads++;
-    if (pixels) result.bad.push({ tile: r.tile, size: r.size, pixels });
   }
+  result.quads = quads;
+  result.bad.push(...bad.values());
 
   const img = new Image();
   img.src = atlas.canvas.toDataURL();

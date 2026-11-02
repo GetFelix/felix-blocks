@@ -8,6 +8,9 @@ const [url, out] = process.argv.slice(2);
 if (!url) throw new Error('usage: check-atlas.mjs <atlas page url> [screenshot dir]');
 if (out) mkdirSync(out, { recursive: true });
 
+// Of 88 quads, an atlas with no padding bleeds on about 28. Far fewer means the check has gone blind.
+const MIN_BLEEDING_QUADS = 10;
+
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
@@ -17,12 +20,15 @@ async function run(query, shot) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-  await page.goto(url + query, { waitUntil: 'load', timeout: 120_000 });
-  await page.waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 120_000 });
-  const result = await page.evaluate(() => window.__atlasResult);
-  if (out && shot) await page.screenshot({ path: `${out}/${shot}.png`, fullPage: true });
-  await page.close();
-  return { result, errors };
+  try {
+    await page.goto(url + query, { waitUntil: 'load', timeout: 120_000 });
+    await page.waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 120_000 });
+    return { result: await page.evaluate(() => window.__atlasResult), errors };
+  } finally {
+    // Kept even when the page never finished, which is when the picture is most wanted.
+    if (out && shot) await page.screenshot({ path: `${out}/${shot}.png`, fullPage: true }).catch(() => {});
+    await page.close();
+  }
 }
 
 const padded = await run('', 'atlas');
@@ -36,7 +42,7 @@ console.log(`unpadded control: ${bare.result.bad.length} quads with bleeding`);
 
 let failed = ok.failures.length > 0 || ok.bad.length > 0 || padded.errors.length > 0;
 for (const e of [...ok.failures, ...padded.errors, ...bare.errors]) console.error(e);
-if (bare.result.bad.length < 10) {
+if (bare.result.bad.length < MIN_BLEEDING_QUADS) {
   console.error('the check saw almost no bleeding without padding, so it cannot tell padding from none');
   failed = true;
 }

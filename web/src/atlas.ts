@@ -6,8 +6,8 @@ import { TILE_STYLES } from './palette';
 import { restyle } from './tiles';
 
 /**
- * Pixels of edge colour around each tile. A tile is 128 px, so mip levels 1 to 3 (64, 32 and 16 px) shrink the
- * border to 8, 4 and 2 px and 16 px covers the first four levels, past which a tile is a few pixels on screen.
+ * Pixels of edge colour around each tile. The border halves at every mip level (16, 8, 4, 2, 1 px), so this covers
+ * levels 0 to 4, down to a tile 8 px wide on screen. Past that the tile is a few pixels and a stray colour does not show.
  */
 export const PAD = 16;
 const COLUMNS = 8;
