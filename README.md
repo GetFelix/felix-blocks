@@ -118,7 +118,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | Milestone | What it proves | State |
 |---|---|---|
-| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline and atlas done |
+| The look, locked | It looks good, day and night, before Felix is involved | In progress: style frame, asset pipeline, atlas and chunk mesher done |
 | A world you can edit, solo | Your world is saved in Felix and opens anywhere | Planned |
 | Multiplayer | Two players in one chunk never overwrite each other | Planned, needs conditional writes in the gateway |
 | A world that lasts | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned |
@@ -131,7 +131,7 @@ second. [docs/design.md](docs/design.md) has the details.
 
 | Path | What is in it |
 |---|---|
-| `core/` | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table. Built to WebAssembly for the page |
+| `core/` | Rust crate with the rules the browser and `blocks-tool` share. Today: the block table and the chunk mesher. Built to WebAssembly for the page |
 | `web/` | The browser client: TypeScript and Three.js, built with Vite |
 | `web/assets/` | The art, with `CREDITS.md` listing each pack's source and licence |
 | `prototype/` | The style frame, the look the client is built to match |
