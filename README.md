@@ -13,8 +13,9 @@ everyone what changed.
 
 > **Status:** design stage. The [style frame](prototype/style-frame.html) shows
 > the look, day and night. The project's code is started: the block table,
-> the asset pipeline, meshing, terrain generated from a seed, and walking
-> around that terrain in first person. Nothing is saved yet. The plan is in
+> the asset pipeline, meshing, terrain generated from a seed, the keys and
+> values chunks are stored under, and walking around that terrain in first
+> person. Nothing is saved yet. The plan is in
 > [docs/design.md](docs/design.md) and the work is tracked in
 > [milestones](https://github.com/GetFelix/felix-blocks/milestones).
 
