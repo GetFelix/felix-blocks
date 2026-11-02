@@ -328,12 +328,18 @@ resources with `blocks-tool`. The world itself does not move or change.
 
 ### Offline mode
 
-The client can run with no Felix at all. It swaps the gateway client for
-`felix-gateway-client/fake`, an in-memory stand-in with the same shape, and
-saves chunk values to IndexedDB. Nothing else changes, which keeps the offline
-path honest: it is the same code under a different transport. An offline world
-can be uploaded to a Felix world later with `blocks-tool`, since it is the same
-set of keys and values.
+`/play.html?offline=NAME` runs the game with no Felix at all. The page swaps the
+gateway client for `felix-gateway-client/fake`, an in-memory stand-in with the
+same shape, and keeps its `info` and `chunks` entries in IndexedDB under the
+world's name. Nothing else changes, which keeps the offline path honest: it is
+the same code under a different transport (`web/src/offline.ts`). A world is
+made from `?seed=` the first time, with the info `blocks-tool create` would
+write, and keeps that seed afterwards. A second connection to the stand-in only
+watches, and writes every change it hears to IndexedDB one at a time, so the
+page's own writes are kept in order. An offline world can be uploaded to a Felix
+world later with `blocks-tool`, since it is the same set of keys and values.
+Clearing the site's data deletes it. Two tabs on one offline world do not see each
+other's edits, and the later write to a chunk wins, so use one tab.
 
 ### Builders and visitors
 
