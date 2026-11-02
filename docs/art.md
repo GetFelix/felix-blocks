@@ -117,6 +117,25 @@ hardware:
 3. Open `/chunks.html?adapt=1` to see where the distance settles. It starts at 8, steps down if the frames are late,
    and climbs back one tier at a time if they are not.
 
+You do not need npm for this. CI uploads the built site as the `web-dist` artifact on every run, so download one and
+serve it with any static server:
+
+```sh
+gh run download <run id> -R GetFelix/felix-blocks -n web-dist -D web-dist
+cd web-dist && python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/chunks.html?tier=8&debug=1`.
+
+**Measured (2 November 2026).** This was done on a Mac Studio with an Apple M4 Max, a fast desktop GPU, so it is an
+upper bound and not the laptop check above. The site came from the `web-dist` artifact of a CI run on main.
+
+- `/chunks.html?tier=8&debug=1`: the panel read 60 fps at 8 chunks after the walk.
+- `/chunks.html?adapt=1`: the distance climbed from 8 to 9, 10 and 11 chunks, each step reported as "steady, 16.7 ms".
+  It held 60 fps at 11 chunks, with 3016 chunks loaded and none meshing.
+
+The laptop integrated GPU is still to be timed.
+
 ## Night
 
 Night is the same world under a moon: dark but never black, so you can still
