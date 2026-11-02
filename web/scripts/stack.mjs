@@ -50,3 +50,13 @@ export async function openAs(browser, url, world, user, errors) {
   if (!(await page.evaluate(() => window.__edit?.saving))) throw new Error(`${user}'s page is not saving: ${status}`);
   return page;
 }
+
+/**
+ * Stops a page drawing frames, as a browser does for a tab nobody is looking at. Headless Chromium keeps drawing them
+ * in software in one shared GPU process, and a second page's WebGL setup waits behind those frames for minutes on a
+ * small runner. The page keeps its world, its connection and its saving.
+ */
+export const stopDrawing = (page) =>
+  page.evaluate(() => {
+    window.requestAnimationFrame = () => 0;
+  });

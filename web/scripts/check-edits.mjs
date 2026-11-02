@@ -3,10 +3,13 @@
 // Usage: node scripts/check-edits.mjs <play page url> <world>. The page must be served and the dev stack up
 // (dev/up.sh, which also serves the provider that mints the players' tokens). The world must be made with
 // `blocks-tool create`, so it has its info, and let ana and ben in.
-import { launch, openAs } from './stack.mjs';
+import { launch, openAs, stopDrawing } from './stack.mjs';
 
 const [url, world] = process.argv.slice(2);
 if (!world) throw new Error('usage: check-edits.mjs <play page url> <world>');
+
+// Joining the world and reading its info, measured in the page before its scene setup, which software rendering slows.
+const JOIN_BUDGET_MS = 5000;
 
 const browser = await launch();
 const errors = [];
@@ -38,9 +41,12 @@ try {
   await ana.evaluate(() => window.__edit.saved());
   console.log('ana placed a block and it was saved');
 
+  await stopDrawing(ana);
   const ben = await open('ben');
+  const { joinMs } = await ben.evaluate(() => window.__timing);
+  if (!(joinMs < JOIN_BUDGET_MS)) throw new Error(`ben joined in ${joinMs} ms, over ${JOIN_BUDGET_MS} ms`);
   await until(ben, 'ben loading the world', first, 5);
-  console.log('ben saw it on joining');
+  console.log(`ben joined in ${Math.round(joinMs)} ms and saw it`);
   await ben.evaluate(([x, y, z]) => window.__edit.set(x, y, z, 6), second);
   await ben.evaluate(() => window.__edit.saved());
   await until(ana, 'ana watching ben', second, 6);
