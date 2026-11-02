@@ -53,7 +53,13 @@ export async function openOfflineWorld(
   // A second connection that only listens, so every write by the page's own is kept.
   const recorder = new FakeGateway(scope);
   recorder.onCacheChange = (cache, entry) => keep(cache, entry.key, entry.payload);
+  // The stand-in starts watching a tick after the call; wait for that so no write goes unheard.
+  const watching = new Promise<void>((resolve) => {
+    const waiting = new Set(KEPT);
+    recorder.onCacheEntries = (cache) => waiting.delete(cache) && waiting.size === 0 && resolve();
+  });
   for (const cache of KEPT) recorder.cacheWatch(cache);
+  await watching;
   return { client: new FakeGateway(scope), kept: async () => void (await pending) };
 }
 
@@ -93,13 +99,14 @@ function opened(): Promise<IDBDatabase> {
  * its own key prefix.
  */
 export function indexedDbStore(world: string): EntryStore {
-  const prefix = `${world}\0`;
+  // Encoded, so no world's prefix can match another world's keys.
+  const prefix = `${encodeURIComponent(world)}\0`;
   const db = opened();
   const idbKey = (cache: string, key: string) => `${prefix}${cache}\0${key}`;
   return {
     async load() {
       const store = (await db).transaction(OBJECTS, 'readonly').objectStore(OBJECTS);
-      const range = IDBKeyRange.bound(prefix, `${prefix}￿`);
+      const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
       const [keys, values] = await Promise.all([request(store.getAllKeys(range)), request(store.getAll(range))]);
       return keys.map((full, i) => {
         const [cache, key] = String(full).slice(prefix.length).split('\0') as [string, string];

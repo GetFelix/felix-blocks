@@ -13,11 +13,13 @@ const browser = await chromium.launch({
 const context = await browser.newContext({ viewport: { width: 640, height: 360 } });
 const errors = [];
 const sockets = [];
+const elsewhere = [];
 const open = async (query) => {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   page.on('websocket', (ws) => sockets.push(ws.url()));
+  page.on('request', (r) => new URL(r.url()).origin !== new URL(url).origin && elsewhere.push(r.url()));
   const where = new URL(url);
   where.search = query;
   await page.goto(where.href, { waitUntil: 'load', timeout: 120_000 });
@@ -63,6 +65,7 @@ try {
   // Another name is another world, made from its own seed.
   const other = await open('offline=other&seed=3');
   if ((await terrain(other)) === before) throw new Error('two offline worlds are the same world');
+  if (elsewhere.length > 0) throw new Error(`the page asked for ${elsewhere.join(', ')}`);
   if (sockets.length > 0) throw new Error(`the page opened ${sockets.length} connection(s): ${sockets.join(', ')}`);
 } catch (e) {
   failure = String(e);

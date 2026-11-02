@@ -338,7 +338,8 @@ write, and keeps that seed afterwards. A second connection to the stand-in only
 watches, and writes every change it hears to IndexedDB one at a time, so the
 page's own writes are kept in order. An offline world can be uploaded to a Felix
 world later with `blocks-tool`, since it is the same set of keys and values.
-Clearing the site's data deletes it.
+Clearing the site's data deletes it. Two tabs on one offline world do not see each
+other's edits, and the later write to a chunk wins, so use one tab.
 
 ### Builders and visitors
 

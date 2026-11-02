@@ -38,9 +38,11 @@ or the mouse wheel next to it.
 To keep a world in your browser without Felix, add `?offline=NAME`
 (`/play.html?offline=mine&seed=11`). The page then talks to an in-memory stand-in
 for the gateway and keeps what you build in IndexedDB, so the world is still
-there after a reload and works with no network. It is made from `?seed=` the
+there after a reload and the game needs no network once the page is loaded (it has no service worker, so something has to serve the page). It is made from `?seed=` the
 first time; after that it keeps the seed it was made with. Clearing the site's
-data deletes it.
+data deletes it, and a browser under storage pressure may too. Use one tab per
+offline world: two tabs do not see each other's edits, and the later write to a
+chunk wins.
 
 By default nothing is saved. To build in a world kept in Felix, start the
 [Felix stack](#the-felix-stack), make a world with `blocks-tool` (see there),

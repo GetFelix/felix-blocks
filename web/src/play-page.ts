@@ -111,7 +111,8 @@ async function run() {
       throw e;
     }
     name = worldName;
-  } else if (offlineName) {
+  } else if (offlineName !== null) {
+    if (offlineName === '') throw new Error('?offline= needs a name for the world');
     offline = await openOfflineWorld(indexedDbStore(offlineName), seed, (e) => {
       console.error('keeping the world in this browser failed', e);
       status.textContent = `not saved: ${e instanceof Error ? e.message : e}`;
