@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Felix Blocks atlas</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #0a1018;
+        color: #e8eef3;
+        font:
+          500 14px Inter,
+          system-ui,
+          sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      p,
+      #status {
+        margin: 0 0 16px;
+        color: #93a3b1;
+      }
+      #status {
+        font:
+          500 12px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      #status.ok {
+        color: hsl(192, 90%, 46%);
+      }
+      #status.fail {
+        color: #ff7a59;
+      }
+      canvas,
+      #atlas img {
+        display: block;
+        max-width: 100%;
+        margin-bottom: 16px;
+      }
+      #atlas img {
+        image-rendering: pixelated;
+        background: repeating-conic-gradient(#1b2530 0% 25%, #141c25 0% 50%) 0 0 / 16px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Felix Blocks atlas</h1>
+    <p>
+      Every tile drawn at 60, 44, 28 and 12 pixels, one row each, against magenta, cut out of the atlas. Each must match
+      the same tile drawn from a texture of its own; a neighbour's colour at an edge fails.
+    </p>
+    <p id="status">loading</p>
+    <canvas id="strip"></canvas>
+    <div id="atlas"></div>
+    <script type="module" src="/src/atlas-page.ts"></script>
+  </body>
+</html>

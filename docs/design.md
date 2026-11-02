@@ -274,8 +274,8 @@ Candidates from [Kenney](https://kenney.nl), all CC0, checked on kenney.nl:
 
 The style frame uses the Voxel Pack and Blocky Characters from
 `web/assets/`, which the client loads the same way. [docs/art.md](art.md) has
-the palette and the restyling. Building the atlas in the client is the next
-step of the look.
+the palette and the restyling. The client builds the atlas from them when it loads. The test scene `/atlas.html` shows it, and
+putting it on chunk meshes is the next step.
 
 ## Build order
 
