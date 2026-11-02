@@ -238,9 +238,15 @@ jobs:
           # Exactly the four files the README names, each with a checksum.
           [ "$(ls -1 ./*.tar.gz | wc -l)" -eq 4 ] || { echo "::error::expected four tarballs"; exit 1; }
 
+      # Created as a draft and published last, so a failed upload never leaves a public release with missing files.
+      # A re-run of this job finishes the draft it finds.
       - name: Publish the release
         run: |
           flags=()
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
-          gh release create "$TAG" --verify-tag --title "Felix Blocks ${TAG}" \
-            "${flags[@]}" --notes-file parts/notes.md parts/*.tar.gz parts/*.sha256
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --verify-tag --title "Felix Blocks ${TAG}" \
+              "${flags[@]}" --notes-file parts/notes.md
+          fi
+          gh release upload "$TAG" --clobber parts/*.tar.gz parts/*.sha256
+          gh release edit "$TAG" --draft=false

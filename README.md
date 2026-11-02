@@ -35,11 +35,11 @@ gh release download v0.1.0 -R GetFelix/felix-blocks -p 'felix-blocks-web-v0.1.0.
 shasum -a 256 -c felix-blocks-web-v0.1.0.tar.gz.sha256
 tar xzf felix-blocks-web-v0.1.0.tar.gz
 cd felix-blocks-web-v0.1.0
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Without `gh`, download the same two files from
-`https://github.com/GetFelix/felix-blocks/releases/download/v0.1.0/` with `curl -LO`.
+Without `gh`, download any release file, and its `.sha256`, with
+`curl -LO https://github.com/GetFelix/felix-blocks/releases/download/v0.1.0/<file name>`.
 
 Then open these in a browser:
 
@@ -58,15 +58,15 @@ Ctrl-C when you are done.
 
 This keeps the world on a Felix broker on your machine. It needs Docker or Podman with Compose v2
 (or podman-compose 1.4 or later), ports 5000/udp, 8080, 8443, 8787 and 9400 free, and the web
-server above still running. In another terminal, pick the `blocks-tool` for your machine
-(`linux-x86_64` or `macos-arm64`):
+server above still running. In another terminal, set `PLATFORM` to `linux-x86_64` or `macos-arm64`, whichever matches your machine:
 
 ```bash
+PLATFORM=macos-arm64
 gh release download v0.1.0 -R GetFelix/felix-blocks \
-  -p 'felix-blocks-compose-v0.1.0.tar.gz*' -p 'blocks-tool-v0.1.0-macos-arm64.tar.gz*'
+  -p 'felix-blocks-compose-v0.1.0.tar.gz*' -p "blocks-tool-v0.1.0-${PLATFORM}.tar.gz*"
 for f in *.sha256; do shasum -a 256 -c "$f"; done
 tar xzf felix-blocks-compose-v0.1.0.tar.gz
-tar xzf blocks-tool-v0.1.0-macos-arm64.tar.gz
+tar xzf "blocks-tool-v0.1.0-${PLATFORM}.tar.gz"
 cd felix-blocks-compose-v0.1.0
 ./up.sh
 ```
@@ -80,7 +80,7 @@ export BLOCKS_ISSUER=http://127.0.0.1:9400 \
   BLOCKS_FELIX_TOKEN_FILE=state/admin.token \
   BLOCKS_FELIX_DATA_TOKEN_FILE=state/admin-data.token \
   BLOCKS_FELIX_CA_FILE=state/broker-cert.pem
-../blocks-tool-v0.1.0-macos-arm64/blocks-tool create play --owner ana --seed 7
+"../blocks-tool-v0.1.0-${PLATFORM}/blocks-tool" create play --owner ana --seed 7
 TOKEN=$(curl -s 'http://127.0.0.1:9400/token?sub=ana&aud=felix-blocks' \
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["id_token"])')
 echo "http://localhost:8000/play.html?gateway=ws://127.0.0.1:8787/ws&world=play&token=$TOKEN"
@@ -314,7 +314,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |
 | Region watches             | Joining costs what you can see, not the whole world                              | Planned                                                                                                                                              |
 | Scale and failover         | 50 players, broker restarts and failover                                         | Planned                                                                                                                                              |
-| Self-hosting               | Anyone can run it                                                                | Planned                                                                                                                                              |
+| Self-hosting               | Anyone can run it                                                                | Partly: release files and a compose bundle for the dev stack ship; Helm and a production setup are planned                                           |
 
 ## Repository layout
 

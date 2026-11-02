@@ -5,8 +5,7 @@ Usage: check-release-version.py v0.1.0, from the root of the tree to check.
 
 The crates, the web package and the commands in the README each name a
 version, so a missed bump ships a release whose parts disagree. This runs
-before anything is published, and on every pull request against the tree's own
-version.
+before anything is published, and in CI against the tree's own version.
 """
 
 import json

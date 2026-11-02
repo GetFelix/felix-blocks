@@ -40,4 +40,4 @@ A release is a `v*` tag. Before tagging, a pull request bumps the version in `co
 `Cargo.lock`, `web/package.json` and `web/package-lock.json`, moves the CHANGELOG entry from "Unreleased" to the new
 version, and updates the version in the README's "Install a release" commands. The release workflow refuses a tag
 that does not match all of them. Pushing the tag builds the files and publishes the release. A pull request that
-touches the release workflow, and a manual run of it, build everything and publish nothing.
+touches the release workflow, and a manual run of it, build everything and publish nothing. CI checks the tree's versions and those commands against each other on every pull request. If the tag check fails anyway, delete the tag (`git push origin :refs/tags/vX.Y.Z`), fix main and tag again. If publishing fails part way, re-run the release job: it finishes the draft release it finds.
