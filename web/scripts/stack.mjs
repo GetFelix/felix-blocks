@@ -31,6 +31,8 @@ export async function openAs(browser, url, world, user, errors) {
   where.searchParams.set('gateway', GATEWAY);
   where.searchParams.set('world', world);
   where.searchParams.set('token', await idToken(user));
+  // A short view keeps two software-rendered pages from starving each other on a small runner.
+  where.searchParams.set('tier', '4');
   await page.goto(where.href, { waitUntil: 'load', timeout: 120_000 });
   await page
     .waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 300_000 })
@@ -48,3 +50,13 @@ export async function openAs(browser, url, world, user, errors) {
   if (!(await page.evaluate(() => window.__edit?.saving))) throw new Error(`${user}'s page is not saving: ${status}`);
   return page;
 }
+
+/**
+ * Stops a page drawing frames, as a browser does for a tab nobody is looking at. Headless Chromium keeps drawing them
+ * in software in one shared GPU process, and a second page's WebGL setup waits behind those frames for minutes on a
+ * small runner. The page keeps its world, its connection and its saving.
+ */
+export const stopDrawing = (page) =>
+  page.evaluate(() => {
+    window.requestAnimationFrame = () => 0;
+  });

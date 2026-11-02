@@ -5,7 +5,7 @@
 // Usage: node scripts/check-load.mjs <play page url> <world>. The page must be served and the dev stack up; the world is
 // made with `blocks-tool create` and lets ana and ben in. Run it against a world nobody has built in.
 import { GatewayClient } from 'felix-gateway-client';
-import { GATEWAY, idToken, launch, openAs } from './stack.mjs';
+import { GATEWAY, idToken, launch, openAs, stopDrawing } from './stack.mjs';
 
 const [url, world] = process.argv.slice(2);
 if (!world) throw new Error('usage: check-load.mjs <play page url> <world>');
@@ -33,6 +33,7 @@ try {
   if (await ana.evaluate(() => window.__edit.saving && document.getElementById('status').className === 'fail'))
     throw new Error('saving the chunks failed');
   console.log(`${edited.length} chunks edited and saved`);
+  await stopDrawing(ana);
 
   // What Felix costs: join as ben, read the info and ask for the chunks, as the page does, until all 500 have arrived.
   // Measured here and not in the page, whose software-rendered scene setup holds up the event loop for seconds.
