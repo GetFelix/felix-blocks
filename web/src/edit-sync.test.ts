@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { GatewayError } from 'felix-gateway-client';
 import { FakeGateway, FakeScope } from 'felix-gateway-client/fake';
 import { beforeAll, expect, test } from 'vitest';
 import { decodeValue, keyOf } from './chunk-store';
@@ -17,7 +18,10 @@ const [CX, CY, CZ] = [100, 5, 100];
 let KEY = '';
 const at = (dx: number, dy: number, dz: number) => [CX * 16 + dx, CY * 16 + dy, CZ * 16 + dz] as const;
 
-function player(scope: FakeScope, options: { onError?: (e: unknown) => void } = {}) {
+function player(
+  scope: FakeScope,
+  options: { onError?: (e: unknown) => void; onBadValue?: (key: string, e: unknown) => void } = {},
+) {
   const world = new EditableWorld(createGeneratedWorld(11));
   const changed: ChunkPos[][] = [];
   const gateway = new FakeGateway(scope);
@@ -183,11 +187,57 @@ test('a failed write keeps the edit and is tried again later', async () => {
   expect(scope.caches.get('chunks')?.has(KEY)).toBe(true);
 });
 
+test('a write the gateway refuses for its rate waits for the bucket and reports nothing', async () => {
+  const scope = new FakeScope();
+  const errors: unknown[] = [];
+  const a = player(scope, { onError: (e) => errors.push(e) });
+  const put = a.gateway.cachePutIf.bind(a.gateway);
+  let refusing = true;
+  a.gateway.cachePutIf = async (...args) => {
+    if (refusing) throw new GatewayError('rate_limited', 'this session is writing faster than the gateway allows', 300);
+    return put(...args);
+  };
+  a.sync.edit(...at(1, 0, 0), 4);
+  await a.sync.flush();
+  refusing = false;
+  // Still held: the gateway asked for 300 ms.
+  a.clock.now += 100;
+  await a.sync.flush();
+  expect(a.sync.dirty).toBe(true);
+  a.clock.now += 200;
+  await a.sync.flush();
+  expect(a.sync.dirty).toBe(false);
+  expect(errors).toHaveLength(0);
+  expect(stored(scope, a.world, 1, 0, 0)).toBe(4);
+});
+
 test('a value that cannot be read is skipped', () => {
   const errors: unknown[] = [];
   const a = player(new FakeScope(), { onError: (e) => errors.push(e) });
   a.sync.ingest(KEY, Uint8Array.of(9, 9, 9));
   expect(errors).toHaveLength(1);
+});
+
+test('a bad value nobody has edited goes to onBadValue, not onError', () => {
+  const errors: unknown[] = [];
+  const bad: string[] = [];
+  const a = player(new FakeScope(), { onError: (e) => errors.push(e), onBadValue: (key) => bad.push(key) });
+  a.sync.ingest(KEY, Uint8Array.of(9, 9, 9));
+  expect(bad).toEqual([KEY]);
+  expect(errors).toHaveLength(0);
+});
+
+test('a bad value in a chunk with unsaved edits is a failed save', async () => {
+  const scope = new FakeScope();
+  scope.writeCache('chunks', KEY, Uint8Array.of(9, 9, 9));
+  const errors: unknown[] = [];
+  const bad: string[] = [];
+  const a = player(scope, { onError: (e) => errors.push(e), onBadValue: (key) => bad.push(key) });
+  a.sync.edit(...at(1, 0, 0), 4);
+  await a.sync.flush();
+  expect(errors).toHaveLength(1);
+  expect(bad).toHaveLength(0);
+  expect(a.sync.dirty).toBe(true);
 });
 
 test('a watch change during our put does not undo the write that put made', async () => {

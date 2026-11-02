@@ -245,7 +245,7 @@ Each edit is a compare-and-set on the chunk's key:
 4. Applied: the answer carries the new version. The pending changes become real.
 5. Refused: someone wrote the chunk first. The client reads the key with its version, replays its pending changes on top of that value, and writes again, up to five times in one round before it waits for the next. A change whose cell the other player also changed is dropped in favour of the stored one, and the player sees their block replaced. A read that returns the version the client already holds is its own write coming back and changes nothing.
 
-A write that fails for another reason (the connection, a visitor who may not write) leaves the changes pending, and the client tries that chunk again a second later. The code is `web/src/edit-sync.ts`; `web/src/editable-world.ts` holds the blocks the player sees, and `web/src/raycast.ts` finds the block a click targets.
+A write that fails for another reason (the connection, a visitor who may not write) leaves the changes pending, and the client tries that chunk again a second later. The gateway also limits how fast a session may write (by default a burst of 100 and then 50 a second). The page joins with the `rate_limited` feature, so a refused write says how long to wait. The client then holds all its writes for that long and reports nothing, since the edits are safe and go out as soon as the bucket has refilled. The code is `web/src/edit-sync.ts`; `web/src/editable-world.ts` holds the blocks the player sees, and `web/src/raycast.ts` finds the block a click targets.
 
 This gives demonstration 1: two players in one chunk never overwrite each
 other, because the second write is refused and rebased instead of applied. The
@@ -301,14 +301,23 @@ beacon so it disappears at once.
 ### Joining a world
 
 1. `join` the gateway with the world as the scope.
-2. `cache_get` the world info: seed, size, spawn.
-3. Watch the regions around the spawn point. Generate their chunks while the first values arrive.
+2. `cache_get` the world info: seed, generator version, size, spawn. A world with no info was never created, and the page says so. A world of another size, or from a generator the build does not have, is refused with a reason.
+3. Watch the chunk cache. Generate the terrain around the spawn point meanwhile.
 4. Apply each stored delta, mesh, draw.
 5. Write the online entry, start publishing position.
 
-Terrain generation does not wait for Felix. A client draws the generated world
-as soon as it has the seed and swaps in edited chunks as they arrive, so the
-first frame is not held up by the network.
+Terrain generation does not wait for Felix, but the first frame does wait for
+the watch's first answer, which holds every chunk players changed. Showing the
+generated world first and swapping the edits in would make a player's own
+builds pop in under them, and the answer is quick: 500 edited chunks take in
+within two seconds on a local stack (`npm run load` checks it). If the answer has not come
+after 5 seconds the page draws without it and swaps the edits in when they
+arrive. The player starts at the spawn point, lifted past any blocks players
+built there.
+
+A stored value that cannot be read as a chunk is skipped and logged to the
+console, so that chunk shows its generated blocks. If the player has unsaved
+edits in that chunk, the page says it could not save instead.
 
 ### Single player
 

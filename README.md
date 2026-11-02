@@ -27,7 +27,7 @@ everyone what changed.
 ## Run it
 
 You can walk around a generated world and change it. The play page
-(`/play.html`) drops you into a world made from a seed (`?seed=7` by default).
+(`/play.html`) drops you into a world made from a seed (`?seed=7` by default) and starts you on dry ground near its middle.
 Click it to look around with the mouse, walk with WASD or the arrows, jump with
 space, sprint with shift, and fly with F or a double tap of space (space rises,
 shift sinks, and landing ends the flight). You walk on the generated terrain,
@@ -36,19 +36,25 @@ look at (up to 6 blocks away), right click places the block picked with 1 to 9
 or the mouse wheel next to it.
 
 By default nothing is saved. To build in a world kept in Felix, start the
-[Felix stack](#the-felix-stack) and open the page with the gateway, the world and
-an ID token for a player of that world:
+[Felix stack](#the-felix-stack), make a world with `blocks-tool` (see there),
+and open the page with the gateway, the world and an ID token for a player of
+that world:
 
 ```bash
 TOKEN=$(curl -s 'http://127.0.0.1:9400/token?sub=ana&aud=felix-blocks' | node -pe 'JSON.parse(require("fs").readFileSync(0)).id_token')
-echo "http://localhost:5173/play.html?gateway=ws://127.0.0.1:8787/ws&world=demo&token=$TOKEN"
+echo "http://localhost:5173/play.html?gateway=ws://127.0.0.1:8787/ws&world=play&token=$TOKEN"
 ```
+
+The page reads the world's info, which has the seed, the terrain generator and
+where to start, so there is no `?seed=` for a saved world. It then takes in the
+chunks players already changed before it draws the first frame, and shows
+the world as they were left. A world without info (such as `demo`, which
+`blocks-tool` has not touched) is refused with a message saying so.
 
 Edits show at once and are written to the world's chunk cache every 100 ms,
 one write per changed chunk. The page also watches the cache, so it shows what
-other players build and what you built before. The page's `?seed=` must match the world's seed,
-until the page reads the world info on join. There is no sign-in page yet,
-so the token comes from the development provider.
+other players build while you play. There is no sign-in page yet, so the token
+comes from the development provider.
 
 The rest of what runs is the asset page, which loads
 every block texture and character the game uses, the way the game loads them,
@@ -83,9 +89,13 @@ of play.html>` presses the keys: the player must land, walk, fly up and come
 back down. The physics itself (walls, steps, ceilings, water, chunks that have
 not arrived, and a long walk over real terrain that never ends inside a block)
 is in `web/src/player.test.ts`. With the Felix stack up, `npm run edits -- <url of
-play.html>` opens two players in two pages and checks that a placed block is saved,
-that the other player sees it on joining and sees the next edit live, and that
-both are there after a reload.
+play.html> <world>` opens two players in two pages and checks that a placed block
+is saved, that the other player sees it on joining and sees the next edit live,
+and that both are there after a reload. `npm run load -- <url of play.html>
+<world>` has one player edit 500 chunks and a second one join: every edit must
+be there, and reading the world's info and receiving the 500 chunks, plus the
+page taking them in, must fit in two seconds. It prints the time of the first
+frame but does not judge it, because headless Chromium draws in software.
 
 ### The Felix stack
 
@@ -96,7 +106,7 @@ or Podman with Compose v2 (or podman-compose 1.4 or later), Node 22 for the
 check, and these ports free on localhost: 5000/udp, 8080, 8443, 8787 and 9400.
 It also creates one world, `demo`, that the players `ana` and `ben` may join.
 The world starts empty: its info cache holds nothing until `blocks-tool` writes
-it. The stack also leaves an administrator's tokens in `dev/state/` for
+it, and the play page needs the info, so build in a world made with `blocks-tool`. The stack also leaves an administrator's tokens in `dev/state/` for
 `blocks-tool`.
 
 ```bash
@@ -216,7 +226,7 @@ second. [docs/design.md](docs/design.md) has the details.
 | Milestone                  | What it proves                                                                   | State                                                                                                                                                |
 | -------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The look, locked           | It looks good, day and night, before Felix is involved                           | In progress: style frame, asset pipeline, atlas, chunk mesher, meshing in workers done; view distance tiers built, still to be timed on a laptop GPU |
-| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | In progress: digging and placing saved to a world through the gateway; join timing and offline mode to do                                            |
+| A world you can edit, solo | Your world is saved in Felix and opens anywhere                                  | In progress: digging and placing saved to a world through the gateway, a world loaded from its info on join; offline mode to do                      |
 | Multiplayer                | Two players in one chunk never overwrite each other                              | Planned. The gateway relays conditional writes since 0.8.0                                                                                           |
 | A world that lasts         | Compaction keeps the world at its current blocks; rejoin picks up where you left | Planned                                                                                                                                              |
 | Worlds with owners         | Builders and visitors, enforced by Felix                                         | Planned                                                                                                                                              |

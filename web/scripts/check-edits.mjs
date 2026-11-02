@@ -1,36 +1,16 @@
 // Builds in a world saved to Felix, with two players in two pages: what one places is saved, a second page opened
 // afterwards has it, an edit by the second shows up live in the first, and after a reload the first has both.
-// Usage: node scripts/check-edits.mjs <play page url> [world]. The page must be served and the dev stack up
-// (dev/up.sh, which also serves the provider that mints the players' tokens); the world is `demo` by default and must let ana and ben in.
-import { chromium } from 'playwright';
+// Usage: node scripts/check-edits.mjs <play page url> <world>. The page must be served and the dev stack up
+// (dev/up.sh, which also serves the provider that mints the players' tokens). The world must be made with
+// `blocks-tool create`, so it has its info, and let ana and ben in.
+import { launch, openAs } from './stack.mjs';
 
-const [url, world = 'demo'] = process.argv.slice(2);
-if (!url) throw new Error('usage: check-edits.mjs <play page url> [world]');
+const [url, world] = process.argv.slice(2);
+if (!world) throw new Error('usage: check-edits.mjs <play page url> <world>');
 
-const browser = await chromium.launch({
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+const browser = await launch();
 const errors = [];
-const IDP = process.env.BLOCKS_ISSUER ?? 'http://127.0.0.1:9400';
-const idToken = async (user) => {
-  const response = await fetch(`${IDP}/token?sub=${user}&aud=felix-blocks`);
-  if (!response.ok) throw new Error(`the provider at ${IDP} answered ${response.status}`);
-  return (await response.json()).id_token;
-};
-const open = async (user) => {
-  const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
-  page.on('pageerror', (e) => errors.push(`${user}: ${e}`));
-  page.on('console', (m) => m.type() === 'error' && errors.push(`${user}: ${m.text()}`));
-  const where = new URL(url);
-  where.searchParams.set('gateway', 'ws://127.0.0.1:8787/ws');
-  where.searchParams.set('world', world);
-  where.searchParams.set('token', await idToken(user));
-  await page.goto(where.href, { waitUntil: 'load', timeout: 120_000 });
-  await page.waitForFunction(() => window.__ready === true, null, { polling: 100, timeout: 300_000 });
-  const status = await page.evaluate(() => document.getElementById('status').textContent);
-  if (!(await page.evaluate(() => window.__edit?.saving))) throw new Error(`${user}'s page is not saving: ${status}`);
-  return page;
-};
+const open = (user) => openAs(browser, url, world, user, errors);
 const block = (page, cell) => page.evaluate(([x, y, z]) => window.__edit.block(x, y, z), cell);
 const until = (page, what, cell, id) =>
   page
