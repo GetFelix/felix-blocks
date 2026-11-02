@@ -23,7 +23,7 @@ import { blocksPlayer, lookDirection, raycast, REACH, targetTable } from './rayc
 import { createLook } from './scene';
 import { blocksOf, solidTable, waterIds } from './solid';
 import { terrainMaterials, warmUp } from './terrain';
-import { fogFor, ViewDistance } from './view-distance';
+import { fogFor, MAX_TIER, MIN_TIER, ViewDistance } from './view-distance';
 import { INFO_CACHE, infoKey, newWorldStart, readWorldInfo, type WorldStart } from './world-info';
 import { createGeneratedWorld, loadGenerator, terrainLayers, worldChunks } from './worldgen';
 
@@ -52,6 +52,9 @@ const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed') ?? 7);
 // How long to wait for the chunks players changed before showing the world without them; they are drawn when they come.
 const ENTRIES_WAIT_MS = 5000;
+// ?tier=N holds the view distance at N chunks instead of letting the frame time pick it (the checks use a short one).
+const held = Number(params.get('tier') ?? NaN);
+const fixedTier = Number.isFinite(held) ? Math.max(MIN_TIER, Math.min(MAX_TIER, Math.round(held))) : null;
 const status = document.getElementById('status')!;
 // What the status line calls the world: its name in Felix, or the seed.
 let name = '';
@@ -219,7 +222,7 @@ async function run() {
       }),
     );
   };
-  const distance = new ViewDistance({ start: 8 });
+  const distance = new ViewDistance({ start: fixedTier ?? 8 });
   const overlay = new DebugOverlay();
   overlay.toggle(params.get('debug') === '1');
   const fog = scene.fog as THREE.Fog;
@@ -289,7 +292,7 @@ async function run() {
 
     recent.push(delta);
     if (recent.length > 30) recent.shift();
-    if (distance.record(delta, view.pending) !== null) Object.assign(fog, fogFor(distance.tier));
+    if (fixedTier === null && distance.record(delta, view.pending) !== null) Object.assign(fog, fogFor(distance.tier));
     overlay.update({
       tier: distance.tier,
       fps: 1000 / (recent.reduce((a, b) => a + b, 0) / recent.length),
