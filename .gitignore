@@ -5,3 +5,4 @@ dist/
 /web/src/core/
 /web/frames/
 /dev/state/
+__pycache__/
