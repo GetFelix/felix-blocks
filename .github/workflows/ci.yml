@@ -181,10 +181,20 @@ jobs:
       - run: python3 .github/scripts/check-release-version.py "v$(jq -r .version web/package.json)"
 
   # The one check main requires, so a job added later is covered without changing the ruleset.
+  # Cheap: python only. Catches a misnamed or empty fragment before the release does.
+  changelog:
+    name: changelog fragments
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/changelog-assemble.py --check
+      - run: python3 .github/scripts/test_changelog_assemble.py
+
   ci-ok:
     name: CI ok
     if: always()
-    needs: [web, rust-fmt, rust-clippy, rust-test, stack, versions]
+    needs: [web, rust-fmt, rust-clippy, rust-test, stack, versions, changelog]
     runs-on: ubuntu-latest
     steps:
       - run: |
