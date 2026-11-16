@@ -2,6 +2,24 @@
 
 # Felix Blocks
 
+<p align="center">
+  <a href="https://github.com/GetFelix/felix-blocks/actions/workflows/ci.yml">
+    <img src="https://github.com/GetFelix/felix-blocks/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI" />
+  </a>
+  <a href="https://github.com/GetFelix/felix-blocks/releases">
+    <img src="https://img.shields.io/github/v/release/GetFelix/felix-blocks?sort=semver&label=release" alt="Latest release" />
+  </a>
+  <a href="https://github.com/GetFelix/felix-blocks/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  </a>
+  <a href="https://www.rust-lang.org/">
+    <img src="https://img.shields.io/badge/rust%20min-1.97-blue" alt="Minimum supported Rust 1.97" />
+  </a>
+  <a href="https://github.com/GetFelix/felix-blocks/blob/main/rust-toolchain.toml">
+    <img src="https://img.shields.io/badge/rust%20built%20with-1.97-blue" alt="Built and tested with Rust 1.97" />
+  </a>
+</p>
+
 A voxel building game for the browser, alone or with friends, whose only
 backend is [Felix](https://github.com/GetFelix/felix).
 
